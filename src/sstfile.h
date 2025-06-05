@@ -143,6 +143,7 @@ public:
     std::string minKey() const;
     std::string maxKey() const;
     static SSTFile readAndCreate(const std::filesystem::path& sst_path);
+    SSTFile shrink(uint32_t datablock_size) const;
     static std::vector<SSTFile> merge(
         const std::filesystem::path& sst1_path,
         const std::vector<std::filesystem::path>&,

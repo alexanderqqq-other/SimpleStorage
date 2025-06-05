@@ -176,6 +176,8 @@ SSTFile SSTFile::readAndCreate(const std::filesystem::path& sst_path) {
     return SSTFile(sst_path, indexblock_offset, seq_num, max_key, std::move(index_block));
 }
 
+
+
 std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
     result.reserve(max_results);
@@ -194,6 +196,12 @@ std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsi
     }
 
     return result;
+}
+
+SSTFile SSTFile::shrink(uint32_t datablock_size) const {
+    auto first_out_path = path_.string() + std::string("_cleaned_.tmp");
+    return SSTFile::writeAndCreate(first_out_path, datablock_size, seqNum(),
+        false, begin(), end());
 }
 
 std::vector<SSTFile> SSTFile::merge(

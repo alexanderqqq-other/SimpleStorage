@@ -309,6 +309,8 @@ These operations use the shared `readwrite_mutex_`:
 
 * Similar to `merge`: performs file compaction off the lock.
 * Acquires **exclusive lock** only briefly for atomic renaming and cleanup.
+* Can be configured to run periodically using Config::shrink_timer_minutes.
+By default value is 0, which means shrink timer is disabled.
 
 #### `remove`, `removeAsync`
 * remove just add or overwite remove record in MemTable under under **exclusive lock**.

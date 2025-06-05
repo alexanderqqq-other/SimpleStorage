@@ -48,6 +48,10 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
     : manifest_(data_dir, config), data_dir_(data_dir),
     worker_thread_([this](std::stop_token st) { workerLoop(st); }), lock_file_(data_dir / lock_file_name){
     const auto& real_config = manifest_.getConfig();
+    MergeLog merge_log(data_dir_ / merge_log_name);
+    for (const auto& path: merge_log.filesToRemove()) {
+        std::filesystem::remove(path);
+    }
     levels_.push_back(std::make_unique<MemTable>(real_config.memtable_size_bytes)); // First level is MemTable
     levels_.push_back(std::make_unique<LevelZero>(data_dir / level0_name, real_config.l0_max_files)); // Level 0 of the storage
     auto nonzero_level_config = generateLevelConfigs(real_config.memtable_size_bytes, real_config.l0_max_files);
@@ -58,6 +62,9 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
     }
     completeMerge();
     removeAllTemporaryFiles();
+    if (real_config.shrink_timer_minutes > 0) {
+        shrink_timer_thread_ = std::jthread([this](std::stop_token st) { this->shrinkTimerLoop(st); });
+    }
 }
 
 SimpleStorage::~SimpleStorage() {
@@ -179,6 +186,7 @@ void SimpleStorage::completeMerge() {
         }
         level_ptr->addSST(std::move(to_merge));
     }
+
     merge_log.removeFiles(); // Remove the merge log file after processing
 }
 
@@ -199,6 +207,15 @@ void SimpleStorage::mergeAsync(int level, uint64_t maxSeqNum) {
 
 MemTable* SimpleStorage::memTable() {
     return static_cast<MemTable*>(levels_[0].get());
+}
+
+void SimpleStorage::shrinkTimerLoop(std::stop_token stop_token) {
+    while (!stop_token.stop_requested()) {
+        auto minutes = manifest_.getConfig().shrink_timer_minutes;
+        std::this_thread::sleep_for(std::chrono::minutes(minutes));
+        if (stop_token.stop_requested()) break;
+        this->shrink();
+    }
 }
 
 void SimpleStorage::workerLoop(std::stop_token stop_token) {
@@ -286,7 +303,22 @@ void SimpleStorage::handleRemoveSST(const RemoveSSTTask& t) {
 }
 
 void SimpleStorage::handleShrink(const ShrinkTask&) {
-
+    auto* last_level = static_cast<GeneralLevel*>(levels_.back().get());
+    auto merge_result = last_level->shrink(manifest_.getConfig().block_size);
+    MergeLog merge_log(data_dir_ / merge_log_name);
+    for (const auto& sst : merge_result.new_files) {
+        merge_log.addToRegister(levels_.size() - 1, sst.path());
+    }
+    for (const auto& sst_path : merge_result.files_to_remove) {
+        merge_log.addToRemove(sst_path);
+    }
+    merge_log.commit();
+    {
+        std::lock_guard lock(readwrite_mutex_);
+        last_level->removeSSTs(merge_result.files_to_remove);
+        last_level->addSST(std::move(merge_result.new_files));
+    }
+    merge_log.removeFiles();
 }
 
 

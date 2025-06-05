@@ -75,6 +75,7 @@ private:
     void removeAllTemporaryFiles();
     void mergeAsync(int level, uint64_t maxSeqNum);
     MemTable* memTable();
+    void shrinkTimerLoop(std::stop_token stop_token);
     void workerLoop(std::stop_token stop_token);
     void handleMergeTask(const MergeTask&);
     void handleRemoveSST(const RemoveSSTTask&);
@@ -88,6 +89,7 @@ private:
     std::condition_variable queue_cv_;
     std::queue<StorageTask> task_queue_;
     std::jthread worker_thread_;
+    std::jthread shrink_timer_thread_;
     StorageLockFile lock_file_;
 
     static uint64_t sst_sequence_number;

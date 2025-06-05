@@ -40,6 +40,9 @@ Manifest::Manifest(const std::filesystem::path& path, const Config& config):
         if (j.contains("block_size") && j["block_size"].is_number_unsigned()) {
             config_.block_size = j["block_size"].get<size_t>();
         }
+        if (j.contains("shrink_timer_minutes") && j["shrink_timer_minutes"].is_number_unsigned()) {
+            config_.shrink_timer_minutes = j["shrink_timer_minutes"].get<uint32_t>();
+        }
 
     }
     else {
@@ -48,6 +51,7 @@ Manifest::Manifest(const std::filesystem::path& path, const Config& config):
         j["memtable_size_bytes"] = config_.memtable_size_bytes;
         j["l0_max_files"] = config_.l0_max_files;
         j["block_size"] = config_.block_size;
+        j["shrink_timer_minutes"] = config_.shrink_timer_minutes;
 
         std::ofstream out(manifest_path);
         if (!out.is_open()) {

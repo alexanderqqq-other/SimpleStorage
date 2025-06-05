@@ -22,7 +22,7 @@ public:
     uint64_t maxSeqNum() const override {
         return seq_num_map_.empty() ? 0 : seq_num_map_.rbegin()->second->seqNum();
     }
-
+    MergeResult shrink(uint32_t datablock_size);
 private:
 
     std::filesystem::path path_;

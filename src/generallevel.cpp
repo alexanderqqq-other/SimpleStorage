@@ -171,3 +171,12 @@ void GeneralLevel::removeSSTs(const std::vector<std::filesystem::path>& sst_path
         }
     }
 }
+
+IFileLevel::MergeResult GeneralLevel::shrink(uint32_t datablock_size) {
+    MergeResult result;
+    for (const auto& file : lru_sst_files_) {
+        result.new_files.push_back(file.shrink(datablock_size));
+        result.files_to_remove.push_back(file.path());
+    }
+    return result;
+}
