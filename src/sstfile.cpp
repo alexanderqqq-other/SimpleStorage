@@ -255,7 +255,7 @@ std::vector<SSTFile> SSTFile::merge(
         if (builder.currentSize() >= max_file_size - datablock_size) {
             result.push_back(builder.finalize());
             ++current_seq_index;
-            if (current_seq_index > seq_nums.size()) {
+            if (current_seq_index >= seq_nums.size()) {
                 throw std::runtime_error("Merge result can not exceed dsestanation file numbers + 1");
             }
             auto p = out_dir / ("merged_" + std::to_string(seq_nums[current_seq_index]) + ".tmp");

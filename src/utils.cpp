@@ -6,7 +6,7 @@ using namespace std::chrono;
 
 uint64_t Utils::getNow()
 {
-    return duration_cast<milliseconds>(steady_clock::now().time_since_epoch()).count();
+    return duration_cast<milliseconds>(system_clock::now().time_since_epoch()).count();
 }
 
 bool Utils::isExpired(uint64_t timestamp)

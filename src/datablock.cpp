@@ -78,8 +78,7 @@ DataBlock::DataBlock(std::vector<uint8_t> data) : data_(std::move(data)) {
     if (data_.size() < sizeof(count_) + offset_table_size) {
         throw std::runtime_error("DataBlock corrupted: Data size is too small to contain a valid offset table.");
     }
-    offset_table_ptr_ = reinterpret_cast<const dblock::OffsetEntryFieldType*>(&data_[data_.size()
-        - sizeof(count_) - offset_table_size]);
+    offset_table_pos_ = static_cast<sst::datablock::OffsetEntryFieldType>(data_.size() - sizeof(count_) - offset_table_size);
     max_entry_ptr_ = static_cast<uint32_t>(data_.size() - sizeof(count_) - offset_table_size);
 }
 
@@ -143,7 +142,7 @@ bool DataBlock::remove(const std::string& key) {
     }
     // don't need to serialize one byte
     static_assert(sizeof(ValueType) == sizeof(uint8_t));
-    data_[pos + key.size() + dblock::KEY_LEN_SIZE] = static_cast<uint8_t>(ValueType::REMOVED);
+    data_[pos + key.size() + dblock::KEY_LEN_SIZE + dblock::EXPIRATION_SIZE] = static_cast<uint8_t>(ValueType::REMOVED);
     return true;  
 }
 
@@ -162,6 +161,7 @@ EntryStatus DataBlock::status(const std::string& key) const {
 
 uint64_t DataBlock::posByOffset(sst::datablock::CountFieldType offsetIdx) const
 {
+    auto offset_table_ptr_ = reinterpret_cast<const dblock::OffsetEntryFieldType*>(&data_[offset_table_pos_]);
     return Utils::deserializeLE<dblock::OffsetEntryFieldType>(reinterpret_cast<const uint8_t*>(&offset_table_ptr_[offsetIdx]));
 }
 

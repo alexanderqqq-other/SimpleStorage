@@ -103,6 +103,7 @@ bool SimpleStorage::removeAsync(const std::string& key) {
     //failed to delete in memtable make async remove in Level 0 and higher
     std::lock_guard lock(queue_mutex_);
     task_queue_.push(RemoveSSTTask{ key, seq_num });
+    queue_cv_.notify_one();
     return false;
 }
 
