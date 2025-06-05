@@ -13,7 +13,7 @@ bool DataBlockBuilder::addEntry(const std::string& key, const Entry& entry, uint
 
     //Current block size + new record size + current offset table size + new offset entry + offset_table_size
     uint64_t new_size = raw_data_.size() + Utils::onDiskEntrySize(key, entry.value) +
-        offset_table_size + dblock::DATABLOCK_COUNT_SIZE;
+        offset_table_size + dblock::DATABLOCK_COUNT_SIZE + sst::datablock::OFFSET_ENTRY_SIZE;
     if (new_size > max_block_size_) {
         return false;
     }
@@ -84,10 +84,14 @@ DataBlock::DataBlock(std::vector<uint8_t> data) : data_(std::move(data)) {
 
 std::optional<Entry> DataBlock::get(const std::string& key) const {
     auto offset = lowerBoundOffset(key);
-    if (!offset.has_value()) {
+    if (offset >= count_) {
         return std::nullopt;
     }
-    auto cursor = posByOffset(offset.value());
+    auto cursor = posByOffset(offset);
+    std::string entry_key = parseKey(cursor);
+    if (entry_key != key) {
+        return std::nullopt;
+    }
     ValueType type = parseValueType(cursor, key.size());
     if (type == ValueType::REMOVED) {
         return Entry{ type, {} };
@@ -113,10 +117,7 @@ std::vector<std::string> DataBlock::keysWithPrefix(const std::string& prefix, un
     if (count_ == 0) return result;
     result.reserve(static_cast<size_t>(max_results));
     auto offset_idx = lowerBoundOffset(prefix);
-    if (!offset_idx.has_value()) {
-        offset_idx = 0;
-    }
-    for (sst::datablock::CountFieldType i = offset_idx.value(); i < count_ && result.size() < static_cast<size_t>(max_results); ++i) {
+    for (sst::datablock::CountFieldType i = offset_idx; i < count_ && result.size() < static_cast<size_t>(max_results); ++i) {
         uint64_t pos = posByOffset(i);
         std::string entry_key = parseKey(pos);
         if (entry_key.compare(0, prefix.size(), prefix) == 0) {
@@ -132,10 +133,14 @@ std::vector<std::string> DataBlock::keysWithPrefix(const std::string& prefix, un
 
 bool DataBlock::remove(const std::string& key) {
     auto offset = lowerBoundOffset(key);
-    if (!offset.has_value()) {
-        return false; 
+    if (offset >= count_) {
+        return false;
     }
-    auto pos = posByOffset(offset.value());
+    auto pos = posByOffset(offset);
+    std::string entry_key = parseKey(pos);
+    if (entry_key != key) {
+        return false;
+    }
     ValueType type = parseValueType(pos, key.size());
     if (type == ValueType::REMOVED) {
         return true;
@@ -148,10 +153,14 @@ bool DataBlock::remove(const std::string& key) {
 
 EntryStatus DataBlock::status(const std::string& key) const {
     auto offset = lowerBoundOffset(key);
-    if (!offset.has_value()) {
+    if (offset >= count_) {
         return EntryStatus::NOT_FOUND; // Key not found
     }
-    auto pos = posByOffset(offset.value());
+    auto pos = posByOffset(offset);
+    std::string entry_key = parseKey(pos);
+    if (entry_key != key) {
+        return EntryStatus::NOT_FOUND;
+    }
     ValueType type = parseValueType(pos, key.size());
     if (type == ValueType::REMOVED) {
         return EntryStatus::REMOVED;
@@ -250,22 +259,19 @@ Value DataBlock::parseValue(uint64_t entry_start_pos, sst::datablock::KeyLengthF
     }
 }
 
-std::optional<sst::datablock::CountFieldType> DataBlock::lowerBoundOffset(const std::string& key) const {
-    int left = 0, right = static_cast<int>(count_) - 1;
-    while (left <= right) {
+sst::datablock::CountFieldType DataBlock::lowerBoundOffset(const std::string& key) const {
+    int left = 0;
+    int right = static_cast<int>(count_);
+    while (left < right) {
         int mid = left + (right - left) / 2;
-        uint64_t pos = posByOffset(mid);
+        uint64_t pos = posByOffset(static_cast<sst::datablock::CountFieldType>(mid));
         std::string entry_key = parseKey(pos);
-        int cmp = key.compare(entry_key);
-        if (cmp == 0) {
-            return mid;
-        }
-        else if (cmp < 0) {
-            right = mid - 1;
+        if (key.compare(entry_key) <= 0) {
+            right = mid;
         }
         else {
             left = mid + 1;
         }
     }
-    return std::nullopt;
+    return static_cast<sst::datablock::CountFieldType>(left);
 }

@@ -31,7 +31,7 @@ private:
     ValueType parseValueType(uint64_t entry_start_pos, sst::datablock::KeyLengthFieldType key_size) const;
     std::string parseKey(uint64_t entry_start_pos) const;
     Value parseValue(uint64_t entry_start_pos, sst::datablock::KeyLengthFieldType key_size, ValueType type) const;
-    std::optional<sst::datablock::CountFieldType> lowerBoundOffset(const std::string& key) const;
+    sst::datablock::CountFieldType lowerBoundOffset(const std::string& key) const;
 
     std::vector<uint8_t> data_;
     sst::datablock::CountFieldType count_ = 0;  // Number of entries in the block

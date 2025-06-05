@@ -1,9 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <cstddef>
 
 namespace sst {
     constexpr uint64_t MAX_L_LAST_SST_FILE_SIZE = 2ull * 1024 * 1024 * 1024 - 1; // 2 GB - 1 byte
-    constexpr uint64_t MIN_MEMTABLE_SIZE = 4ull * 1024 * 1014;
+    constexpr uint64_t MIN_MEMTABLE_SIZE = 4ull * 1024 * 1024;
     constexpr uint64_t MAX_MEMTABLE_SIZE = MAX_L_LAST_SST_FILE_SIZE;
     constexpr uint64_t MIN_L0_NUM_FILES = 2; // Minimum number of files in Level 0
     constexpr uint64_t MIN_BLOCK_SIZE = 2048; // Minimum block size in bytes
