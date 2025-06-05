@@ -310,9 +310,9 @@ These operations use the shared `readwrite_mutex_`:
 * Similar to `merge`: performs file compaction off the lock.
 * Acquires **exclusive lock** only briefly for atomic renaming and cleanup.
 
-#### `remove`
-
-* Tries to remove the key directly from `MemTable` under **exclusive lock**.
+#### `remove`, `removeAsync`
+* remove just add or overwite remove record in MemTable under under **exclusive lock**.
+* removeAsync tries to remove the key directly from `MemTable` under **exclusive lock**.
 * If the key is not found, it defers a background task to **mark the key as `REMOVED`** in SST files using:
 
   * Asynchronous queue.
@@ -328,8 +328,8 @@ These operations use the shared `readwrite_mutex_`:
 | `keysWithPrefix`    | `shared_lock`            | Reads only, optimized for prefix scans          |
 | `put`               | `exclusive_lock`         | May trigger `flush()`                           |
 | `flush()`           | `exclusive_lock`         | May schedule async `merge()`                    |
-| `remove` (MemTable) | `exclusive_lock`         | Immediate removal if key is present             |
-| `remove` (SST)      | Queue + `exclusive_lock` | Marks key as `REMOVED` in SST files             |
+| `remove`            | `exclusive_lock`         | Add remove record             |
+| `removeAsync`       | Queue + `exclusive_lock` | Marks key as `REMOVED` in SST files             |
 | `merge`             | Queue + `exclusive_lock` | Heavy part async, lock held for rename/register |
 | `shrink`            | Queue + `exclusive_lock` | Similar to `merge`, lock only for final step    |
 

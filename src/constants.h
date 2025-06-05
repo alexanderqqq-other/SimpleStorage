@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-constexpr size_t MAX_L1_SST_FILE_SIZE = 2ull * 1024 * 1024 * 1024 - 1; // 2 GB - 1 byte
+constexpr size_t MAX_L_LAST_SST_FILE_SIZE = 2ull * 1024 * 1024 * 1024 - 1; // 2 GB - 1 byte
 namespace sst {
     namespace header {
         // Signature size in SST header (uint32_t)

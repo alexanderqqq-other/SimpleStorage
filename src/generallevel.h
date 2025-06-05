@@ -9,7 +9,7 @@
 // Implementation for Level 1 and higher. Key ranges do not overlap.
 class GeneralLevel : public IFileLevel {
 public:
-    GeneralLevel(const std::filesystem::path& path, size_t max_file_size, size_t max_num_files);
+    GeneralLevel(const std::filesystem::path& path, size_t max_file_size, size_t max_num_files, bool is_last);
     ~GeneralLevel() override = default;
     std::optional<Entry> get(const std::string& key) const override;
     bool remove(const std::string& key, uint64_t max_seq_num) override;
@@ -29,13 +29,15 @@ private:
     size_t max_file_size_;
     uint64_t max_file_index_ = 0; // Used to generate unique file names
     size_t max_num_files_; // Maximum number of SST files allowed in this level
-    bool dirty_ = false; // Indicates if the level has unremoved SST files that need to be cleaned up
+    bool is_last_;
 
     mutable std::list<SSTFile> lru_sst_files_; // Least Recently Used cache for SST files
     std::map<std::string, decltype(lru_sst_files_)::iterator> sst_file_map_; // Maps keys to SST files
     std::map<uint64_t, decltype(lru_sst_files_)::iterator> seq_num_map_; // Maps sequence numbers to SST files
     std::unordered_map<std::string, decltype(lru_sst_files_)::iterator> file_path_map_; // Maps by filepath
 
+
     auto findSST(const std::string& key) -> decltype(lru_sst_files_)::iterator;
     auto findSST(const std::string& key) const -> decltype(lru_sst_files_)::const_iterator;
+
 };

@@ -120,7 +120,7 @@ struct Entry {
 
 
 struct Config {
-    size_t memtable_size_bytes = 64 * 1024 * 1024;
-    size_t l0_max_files = 4;
+    size_t memtable_size_bytes = 64 * 1024 * 1024; //64 MB
+    size_t l0_max_files = 4; 
     size_t block_size = 128 * 1024;
 };

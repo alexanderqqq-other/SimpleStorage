@@ -94,34 +94,58 @@ TEST_F(SimpleStorageTest, LargeVolume_Merge) {
     localConfig.memtable_size_bytes = 1 * 1024 * 1024;  // 1 MB memtable
     localConfig.l0_max_files = 3;                       // Merge after 3 SST files
     localConfig.block_size = 64 * 1024;                  // 64 KB data block size
-
-    auto db = std::make_shared<SimpleStorage>(temp_dir, localConfig);
-
     // Generate a value of ~1 KB, so ~1024 entries fill ~1 MB.
     std::string value(1024, 'x');
 
     // Insert enough entries to produce ~30 MB of data.
     // Each entry is ~1 KB key + 1 KB value + overhead, so 30,000 entries ~ 30 MB.
     const size_t num_entries = 30000;
-    for (size_t i = 0; i < num_entries; ++i) {
-        db->put("key_" + std::to_string(i), value);
+
+    {
+
+        auto db = std::make_shared<SimpleStorage>(temp_dir, localConfig);
+        db->put("to_remove", 123);
+        db->put("to_remove_async", 123);
+        for (size_t i = 0; i < num_entries; ++i) {
+            db->put("key_" + std::to_string(i), value);
+        }
+        // Ensure any remaining entries in memtable are flushed.
+        db->flush();
+        db->remove("to_remove");
+        db->removeAsync("to_remove_async");
+        for (size_t i = 0; i < num_entries; i += 17) {
+            auto key = "key_" + std::to_string(i);
+            auto v = db->get(key);
+            ASSERT_TRUE(v.has_value()) << "Missing key: " << key;
+            EXPECT_EQ(std::get<std::string>(v->value), value);
+        }
+        EXPECT_FALSE(db->get("nonexistent_key").has_value());
+
+        // Allow background merge tasks to complete.
+        std::this_thread::sleep_for(std::chrono::seconds(5));
+
+        //// Verify a few sample keys are retrievable with correct values.
+        for (size_t i = 0; i < num_entries; i+=17) {
+            auto key = "key_" + std::to_string(i);
+            auto v = db->get(key);
+            ASSERT_TRUE(v.has_value()) << "Missing key: " << key;
+            EXPECT_EQ(std::get<std::string>(v->value), value);
+        }
+        EXPECT_FALSE(db->get("nonexistent_key").has_value());
+        EXPECT_FALSE(db->get("to_remove").has_value());
+        EXPECT_FALSE(db->get("to_remove_async").has_value());
     }
 
-    // Ensure any remaining entries in memtable are flushed.
-    db->flush();
-
-    // Allow background merge tasks to complete.
-    std::this_thread::sleep_for(std::chrono::seconds(5));
-
-    // Verify a few sample keys are retrievable with correct values.
-    for (size_t i : { size_t(0), num_entries / 7, num_entries / 2, num_entries - 1 }) {
-        auto key = "key_" + std::to_string(i);
-        auto result = db->get(key);
-        ASSERT_TRUE(result.has_value()) << "Missing key: " << key;
-        EXPECT_EQ(result->type, ValueType::STRING);
-        EXPECT_EQ(std::get<std::string>(result->value), value);
+    {
+        auto db = std::make_shared<SimpleStorage>(temp_dir, config);
+        for (size_t i = 0; i < num_entries; i+=17) {
+            auto key = "key_" + std::to_string(i);
+            auto v = db->get(key);
+            ASSERT_TRUE(v.has_value()) << "Missing key: " << key;
+            EXPECT_EQ(std::get<std::string>(v->value), value);
+        }
+        EXPECT_FALSE(db->get("nonexistent_key").has_value());
+        EXPECT_FALSE(db->get("to_remove").has_value());
+        EXPECT_FALSE(db->get("to_remove_async").has_value());
     }
-
-    // Also verify that a non-existent key returns no value.
-    EXPECT_FALSE(db->get("nonexistent_key").has_value());
 }

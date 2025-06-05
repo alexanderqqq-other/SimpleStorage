@@ -15,7 +15,32 @@ namespace {
     constexpr std::string_view merge_log_name = "merge_log.sstlog";
     constexpr std::string_view memtable_name = "memtable.vsst.tmp";
     constexpr std::string_view lock_file_name = ".lock";
-    constexpr int GENERAL_LEVEL_COUNT = 1;
+    struct LevelParams {
+        size_t max_file_size;
+        size_t max_num_files;
+        bool is_last;
+    };
+    std::vector<LevelParams> generateLevelConfigs(size_t memtable_size_bytes, size_t l0_max_files) {
+        std::vector<LevelParams> levels;
+
+        constexpr int GROWTH_SIZE_FACTOR = 5;
+        constexpr int GROWH_FILE_NUMBER_FACTOR = 2;
+        auto file_size = memtable_size_bytes;
+        auto num_files = l0_max_files;
+        while (true) {
+            file_size *= GROWTH_SIZE_FACTOR;
+            num_files *= GROWH_FILE_NUMBER_FACTOR;
+            file_size = std::min(file_size, MAX_L_LAST_SST_FILE_SIZE);
+
+            if (file_size >= MAX_L_LAST_SST_FILE_SIZE) {
+                levels.push_back(LevelParams{ MAX_L_LAST_SST_FILE_SIZE, std::numeric_limits<size_t>::max(), true });
+                break;
+            }
+            levels.push_back(LevelParams{ file_size, num_files, false });
+        }
+
+        return levels;
+    }
 }
 uint64_t SimpleStorage::sst_sequence_number = 0; 
 
@@ -25,10 +50,11 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
     const auto& real_config = manifest_.getConfig();
     levels_.push_back(std::make_unique<MemTable>(real_config.memtable_size_bytes)); // First level is MemTable
     levels_.push_back(std::make_unique<LevelZero>(data_dir / level0_name, real_config.l0_max_files)); // Level 0 of the storage
-    int non_general_level_count = static_cast<int>(levels_.size());
-    for (int i = 0; i < GENERAL_LEVEL_COUNT; ++i) {
-        levels_.push_back(std::make_unique<GeneralLevel>(data_dir / (levelN_prefix.data() + std::to_string(i + non_general_level_count - 1)),
-            MAX_L1_SST_FILE_SIZE, std::numeric_limits<size_t>::max())); // Level 1
+    auto nonzero_level_config = generateLevelConfigs(real_config.memtable_size_bytes, real_config.l0_max_files);
+    int i = 1;
+    for (const auto&lc: nonzero_level_config) {
+        levels_.push_back(std::make_unique<GeneralLevel>(data_dir / (levelN_prefix.data() + std::to_string(i++)),
+            lc.max_file_size, lc.max_num_files, lc.is_last)); // Level 1+
     }
     completeMerge();
     removeAllTemporaryFiles();
@@ -37,6 +63,7 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
 SimpleStorage::~SimpleStorage() {
     worker_thread_.request_stop();
     queue_cv_.notify_all();
+    flush();
 }
 
 std::optional<Entry> SimpleStorage::get(const std::string& key) const {
@@ -55,22 +82,26 @@ std::optional<Entry> SimpleStorage::get(const std::string& key) const {
     return std::nullopt;
 }
 
-
-bool SimpleStorage::remove(const std::string& key) {
+bool SimpleStorage::removeAsync(const std::string& key) {
     bool success;
     uint64_t seq_num;
     {
         std::lock_guard lock(readwrite_mutex_);
         success = memTable()->remove(key);
         if (success) {
-            return true; 
+            return true;
         }
-        seq_num = sst_sequence_number; // Get the current sequence number from MemTable
+        seq_num = sst_sequence_number; // Get the current sequence number for MemTable
     }
-    //failed to delene in memtable make async remove in Level 0 and higher
+    //failed to delete in memtable make async remove in Level 0 and higher
     std::lock_guard lock(queue_mutex_);
-    task_queue_.push(RemoveSSTTask{ key });
+    task_queue_.push(RemoveSSTTask{ key, seq_num });
     return false;
+}
+
+
+void SimpleStorage::remove(const std::string& key) {
+    putImpl(key, Entry{ ValueType::REMOVED, {} }, sst::datablock::EXPIRATION_DELETED);
 }
 
 
@@ -81,10 +112,10 @@ bool SimpleStorage::exists(const std::string& key) const {
         switch (status) {
         case EntryStatus::EXISTS:
             return true;
-        case EntryStatus::NOT_FOUND:
-            continue;
         case EntryStatus::REMOVED:
             return false;
+        case EntryStatus::NOT_FOUND:
+            continue;
         }
     }
     return false;
@@ -128,8 +159,8 @@ void SimpleStorage::putImpl(const std::string& key, const Entry& entry, uint64_t
 void SimpleStorage::flushImpl() {
     std::vector<SSTFile> ssts;
     ssts.push_back(SSTFile::writeAndCreate(data_dir_ / std::filesystem::path(memtable_name),
-        manifest_.getConfig().block_size,
-        ++sst_sequence_number,
+        manifest_.getConfig().block_size, 
+        ++sst_sequence_number, true,
         memTable()->begin(), memTable()->end()));
     auto* l = static_cast<IFileLevel*>(levels_[1].get());
     l->addSST(std::move(ssts));
@@ -247,8 +278,8 @@ void SimpleStorage::handleMergeTask(const MergeTask& t) {
 
 void SimpleStorage::handleRemoveSST(const RemoveSSTTask& t) {
     std::lock_guard lock(readwrite_mutex_);
-    for (const auto& level : levels_) {
-        if (static_cast<IFileLevel*>(level.get())->remove(t.key, t.seq_num)) {
+    for (int i = 1; i < levels_.size(); ++i) {
+        if (static_cast<IFileLevel*>(levels_[i].get())->remove(t.key, t.seq_num)) {
             return;
         }
     }

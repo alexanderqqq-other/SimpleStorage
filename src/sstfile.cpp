@@ -201,7 +201,8 @@ std::vector<SSTFile> SSTFile::merge(
     const std::vector<std::filesystem::path>& dst_file_paths,
     const std::filesystem::path& out_dir,
     uint64_t max_file_size,
-    uint32_t datablock_size)
+    uint32_t datablock_size,
+    bool keep_removed)
 {
     // Read input files
     SSTFile sst1 = SSTFile::readAndCreate(sst1_path);
@@ -209,7 +210,8 @@ std::vector<SSTFile> SSTFile::merge(
     std::vector<SSTFile> dst_files;
     if (dst_file_paths.empty()) {
         auto first_out_path = out_dir / ("merged_" + std::to_string(sst1.seqNum()) + ".tmp");
-        dst_files.push_back(SSTFile::writeAndCreate(first_out_path, datablock_size, sst1.seqNum(), sst1.begin(), sst1.end()));
+        dst_files.push_back(SSTFile::writeAndCreate(first_out_path, datablock_size, sst1.seqNum(),
+            keep_removed, sst1.begin(), sst1.end()));
         return dst_files;
     }
 
@@ -253,12 +255,12 @@ std::vector<SSTFile> SSTFile::merge(
             builder = SSTBuilder(p, datablock_size, seq_nums[current_seq_index]);
         }
         auto [key1, stt_entry1] = *it1;
-        if (stt_entry1.entry.type == ValueType::REMOVED) {
+        if (!keep_removed && stt_entry1.entry.type == ValueType::REMOVED) {
             ++it1;
             continue;
         }
         auto [key2, stt_entry2] = *it2;
-        if (stt_entry2.entry.type == ValueType::REMOVED) {
+        if (!keep_removed && stt_entry2.entry.type == ValueType::REMOVED) {
             ++it2;
             continue;
         }
@@ -282,7 +284,7 @@ std::vector<SSTFile> SSTFile::merge(
     }
     while (it1 != sst1.end()) {
         auto [key1, stt_entry1] = *it1;
-        if (stt_entry1.entry.type != ValueType::REMOVED) {
+        if (keep_removed || stt_entry1.entry.type != ValueType::REMOVED) {
             builder.addEntry(key1, stt_entry1.entry, stt_entry1.expiration_ms);
         }
         ++it1;
@@ -294,7 +296,7 @@ std::vector<SSTFile> SSTFile::merge(
         }
 
         auto [key2, stt_entry2] = *it2;
-        if (stt_entry2.entry.type != ValueType::REMOVED) {
+        if (keep_removed || stt_entry2.entry.type != ValueType::REMOVED) {
             builder.addEntry(key2, stt_entry2.entry, stt_entry2.expiration_ms);
         }
         ++it2;

@@ -148,11 +148,12 @@ public:
         const std::vector<std::filesystem::path>&,
         const std::filesystem::path& out_dir,
         uint64_t max_file_size,
-        uint32_t datablock_size);
+        uint32_t datablock_size,
+        bool keep_removed);
 
     template <SSTInputIterator InputIt>
-    static SSTFile writeAndCreate(const std::filesystem::path& sst_path, int max_datablock_size,
-        uint64_t seq_num, InputIt begin, InputIt end) {
+    static SSTFile writeAndCreate(const std::filesystem::path& sst_path, int max_datablock_size, uint64_t seq_num,
+        bool keep_removed, InputIt begin, InputIt end) {
         if (begin == end) {
             return SSTFile(sst_path, 0, 0,"", {});
         }
@@ -160,7 +161,9 @@ public:
         SSTBuilder builder(sst_path, max_datablock_size, seq_num);
         for (auto it = begin; it != end; ++it) {
             const auto& val = *it;
-            builder.addEntry(val.first, val.second.entry, val.second.expiration_ms);
+            if (keep_removed || (val.second.entry.type != ValueType::REMOVED && Utils::isExpired(val.second.expiration_ms))) {
+                builder.addEntry(val.first, val.second.entry, val.second.expiration_ms);
+            }
         }
         return builder.finalize();
     }

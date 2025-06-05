@@ -59,7 +59,8 @@ public:
     }
 
     std::optional<Entry> get(const std::string& key) const;
-    bool remove(const std::string& key);
+    bool removeAsync(const std::string& key);
+    void remove(const std::string& key);
     bool exists(const std::string& key) const;
 
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results = 1000) const;

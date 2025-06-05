@@ -45,7 +45,7 @@ TEST_F(SSTFileTest, WriteAndReadBack_MixedTypes) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, items.begin(), items.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
 
         auto val = file.get("a");
         ASSERT_TRUE(val.has_value());
@@ -109,7 +109,7 @@ TEST_F(SSTFileTest, ExpiredEntry_ReturnsRemoved) {
         {"foo", TestEntry{Entry{ValueType::UINT32, uint32_t(1)}, 1}}
     };
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, items.begin(), items.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
         auto v = file.get("foo");
         ASSERT_TRUE(v.has_value());
         EXPECT_EQ(v->type, ValueType::REMOVED);
@@ -133,7 +133,7 @@ TEST_F(SSTFileTest, KeysWithPrefix) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, items.begin(), items.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
         auto keys = file.keysWithPrefix("a", 10);
 
         EXPECT_EQ(keys.size(), 3);
@@ -158,7 +158,7 @@ TEST_F(SSTFileTest, KeysWithPrefix) {
 TEST_F(SSTFileTest, EmptyFile_NoEntries) {
     std::vector<std::pair<std::string, TestEntry>> empty;
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, empty.begin(), empty.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, empty.begin(), empty.end());
 
         auto val = file.get("anykey");
         EXPECT_FALSE(val.has_value());
@@ -248,7 +248,7 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
         }
         };
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BIG_BLOCK_SIZE, 0, items.begin(), items.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BIG_BLOCK_SIZE, 0, true, items.begin(), items.end());
         do_test(file);
 
         auto v = file.get("test_remove_blob");
@@ -299,7 +299,7 @@ TEST_F(SSTFileTest, RemoveEntry_WorksAsExpected) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, items.begin(), items.end());
+        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
 
         auto v1 = file.get("keep1");
         ASSERT_TRUE(v1.has_value());
@@ -420,6 +420,7 @@ TEST_F(SSTFileTest, Iterator_MultiBlock) {
         SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH,
             BLOCK_SIZE_SMALL,
             /*seq_num=*/0,
+            true,
             items.begin(),
             items.end());
 
@@ -494,9 +495,9 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
     uint32_t block_size = 64; // tiny block size
     std::sort(data1.begin(), data1.end(), [](auto& a, auto& b) { return a.first < b.first; });
     std::sort(data2.begin(), data2.end(), [](auto& a, auto& b) { return a.first < b.first; });
-    auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, data1.begin(), data1.end());
+    auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, true, data1.begin(), data1.end());
     std::vector<std::filesystem::path> dst_files;
-    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, data2.begin(), data2.end()).path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end()).path());
 
     // Merge in one file.
 
@@ -558,7 +559,7 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
     // Test merged file
     {
         //merge in one file
-        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size);
+        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size, false);
         ASSERT_TRUE(merged.size() == 1);
         test_f(merged);
         EXPECT_EQ(merged[0].minKey(), "a");
@@ -571,7 +572,7 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
         EXPECT_EQ(readed_files[0].maxKey(), "eee_123");
     }
     {   //merge in two files
-        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size);
+        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size, false);
         ASSERT_TRUE(merged.size() == 2);
         test_f(merged);
         EXPECT_EQ(merged[0].minKey(), "a");
@@ -631,10 +632,10 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
     std::sort(data1.begin(), data1.end(), [](auto& a, auto& b) { return a.first < b.first; });
     std::sort(data2.begin(), data2.end(), [](auto& a, auto& b) { return a.first < b.first; });
     std::sort(data3.begin(), data3.end(), [](auto& a, auto& b) { return a.first < b.first; });
-    auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, data1.begin(), data1.end());
+    auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, true, data1.begin(), data1.end());
     std::vector<std::filesystem::path> dst_files;
-    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, data2.begin(), data2.end()).path());
-    dst_files.push_back(SSTFile::writeAndCreate(sst3_path, block_size, seq3, data3.begin(), data3.end()).path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end()).path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst3_path, block_size, seq3, true, data3.begin(), data3.end()).path());
 
     // Merge in one file.
 
@@ -709,7 +710,7 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
     // Test merged file
     {
         //merge in one file
-        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size);
+        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size, false);
         ASSERT_TRUE(merged.size() == 1);
         test_f(merged);
         EXPECT_EQ(merged.front().minKey(), "a");
@@ -722,7 +723,7 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
         EXPECT_EQ(merged.back().maxKey(), "xdup");
     }
     {   //merge in three files
-        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size);
+        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size, false);
         ASSERT_TRUE(merged.size() == 2);
         test_f(merged);
         EXPECT_EQ(merged.front().minKey(), "a");
