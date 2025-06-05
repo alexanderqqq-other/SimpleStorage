@@ -30,10 +30,10 @@ namespace {
         while (true) {
             file_size *= GROWTH_SIZE_FACTOR;
             num_files *= GROWH_FILE_NUMBER_FACTOR;
-            file_size = std::min(file_size, MAX_L_LAST_SST_FILE_SIZE);
+            file_size = std::min(file_size, sst::MAX_L_LAST_SST_FILE_SIZE);
 
-            if (file_size >= MAX_L_LAST_SST_FILE_SIZE) {
-                levels.push_back(LevelParams{ MAX_L_LAST_SST_FILE_SIZE, std::numeric_limits<size_t>::max(), true });
+            if (file_size >= sst::MAX_L_LAST_SST_FILE_SIZE) {
+                levels.push_back(LevelParams{ sst::MAX_L_LAST_SST_FILE_SIZE, std::numeric_limits<size_t>::max(), true });
                 break;
             }
             levels.push_back(LevelParams{ file_size, num_files, false });
@@ -68,9 +68,9 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
 }
 
 SimpleStorage::~SimpleStorage() {
+    flush();
     worker_thread_.request_stop();
     queue_cv_.notify_all();
-    flush();
 }
 
 std::optional<Entry> SimpleStorage::get(const std::string& key) const {

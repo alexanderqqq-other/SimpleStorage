@@ -9,7 +9,7 @@ public:
     const Config& getConfig() const;
 private:
     const std::filesystem::path& getPath() const;
-    void validateConfig() const;
+    void validateConfig(const Config& config) const;
     Config config_;
     std::filesystem::path data_dir_;
 };

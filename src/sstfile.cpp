@@ -31,7 +31,7 @@ std::vector<uint8_t> SSTFile::readDatablock(const std::filesystem::path path, ss
 }
 
 void SSTFile::writeDatablock(const DataBlock& block, sst::indexblock::OffsetFieldType offsetIndex) const {
-    std::ofstream ofs(path_, std::ios::binary | std::ios::in );
+    std::fstream ofs(path_, std::ios::in | std::ios::out | std::ios::binary);
     if (!ofs) {
         throw std::runtime_error("Failed to open SST file for writing: " + path_.string());
     }

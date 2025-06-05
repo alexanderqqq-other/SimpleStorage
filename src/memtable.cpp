@@ -11,7 +11,7 @@ MemTable::MemTable(size_t max_size_bytes)
 void MemTable::put(const std::string& key, const Entry& entry, uint64_t expiration_ms) {
     data_[key] = MemEntry{ entry, expiration_ms };
     //KeyLengh + key + Expiration + ValueType + ValueLength (optional) + value + offset
-    current_size_bytes_ += key.size() + Utils::onDiskEntrySize(key, entry.value);
+    current_size_bytes_ += Utils::onDiskEntrySize(key, entry.value);
 }
 
 std::optional<Entry> MemTable::get(const std::string& key) const {

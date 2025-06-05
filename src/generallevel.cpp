@@ -105,7 +105,7 @@ std::vector<std::filesystem::path> GeneralLevel::filelistToMerge(uint64_t max_se
     }
     //merge 20% oldest files to next level
     int i = 0;
-    for (auto it = seq_num_map_.begin(); it != seq_num_map_.end() && i < seq_num_map_.size() / 3; ++it) {
+    for (auto it = seq_num_map_.begin(); it != seq_num_map_.end() && i < seq_num_map_.size() ; ++it, i += 5) {
         ret.push_back(it->second->path());
     }
     return ret;

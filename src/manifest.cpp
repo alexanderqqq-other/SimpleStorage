@@ -7,6 +7,7 @@ constexpr std::string_view manifest_filename = "manifest.json";
 constexpr std::string_view expected_type = "SimpleStorage";
 Manifest::Manifest(const std::filesystem::path& path, const Config& config):
     data_dir_(path), config_(config) {
+    validateConfig(config_);
     if (!std::filesystem::exists(data_dir_)) {
         std::filesystem::create_directories(data_dir_);
     }
@@ -69,6 +70,17 @@ const std::filesystem::path& Manifest::getPath() const {
     return data_dir_;
 }
 
-void Manifest::validateConfig() const {
-
+void Manifest::validateConfig(const Config& config) const {
+    if (config.memtable_size_bytes < sst::MIN_MEMTABLE_SIZE || config.memtable_size_bytes > sst::MAX_MEMTABLE_SIZE) {
+        throw std::invalid_argument("Invalid memtable size: " + std::to_string(config.memtable_size_bytes) +
+            ". Must be between " + std::to_string(sst::MIN_MEMTABLE_SIZE) + " and " + std::to_string(sst::MAX_MEMTABLE_SIZE));
+    }
+    if (config.l0_max_files < sst::MIN_L0_NUM_FILES ) {
+        throw std::invalid_argument("Invalid L0 max files: " + std::to_string(config.l0_max_files) +
+            ". Must be between greater than" + std::to_string(sst::MIN_L0_NUM_FILES));
+    }
+    if (config.block_size < sst::MIN_BLOCK_SIZE || config.block_size > sst::MAX_BLOCK_SIZE) {
+        throw std::invalid_argument("Invalid block size: " + std::to_string(config.block_size) +
+            ". Must be between " + std::to_string(sst::MIN_BLOCK_SIZE) + " and " + std::to_string(sst::MAX_BLOCK_SIZE));
+    }
 }

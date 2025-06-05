@@ -23,6 +23,5 @@ public:
 private:
     std::filesystem::path path_;
     size_t max_num_files_;
-    bool dirty_ = false; // Indicates if the level has unremoved SST files that need to be cleaned up
     std::vector<SSTFile> sst_files_;
 };
