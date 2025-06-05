@@ -7,14 +7,14 @@ This library uses LSM (Log-Structured Merge-tree) storage format with SST (Sorte
 ```
 manifest.json
 .lock
-.WAL (optional, Write-Ahead Log for durability)
 data/
-  L0/
-	dat0.vsst
-	dat1.vsst
+  level0/
+	L0_{seq_num}_.vsst
+	L0_{seq_num}.vsst
 	...
-	datN.vsst
-  L1/
+	L0_{seq_num}.vsst
+  level1/
+    lgeneral_{seq_num}_{unique_level_num}.vsst
 	...
 ```
 
@@ -22,11 +22,11 @@ data/
 
 ### Memtable
 
-- Default size: **64MB** (Can be configured: **8MB � 512MB**)
+- Default size: **64MB** (Can be configured: **8MB - 512MB**)
 
 ### Level 0 (L0)
 
-- Maximum number of files: **4** (Can be configured: **2 � 16**)
+- Maximum number of files: **4** (Can be configured: **2 - 16**)
 - File size: **see memtable**
 
 ### Level 1 (L1)
@@ -108,7 +108,7 @@ Number of entries: same as number of DataBlocks in the file. Entries are sorted 
 ## Limitations
 
 - Key length: **<= 1024 bytes**
-- Key lenght + Value length: **<= Block_size - Block_metadata size**
+- Key length + Value length: **<= Block_size - Block_metadata size**
 
 ### Notes
 
@@ -124,19 +124,18 @@ Number of entries: same as number of DataBlocks in the file. Entries are sorted 
 
 The library provides the following minimal set of operations for working with the key-value store:
 
-### open (static)
+### constructor
 
 Open an existing or create a new storage in the specified directory.
 Throws an exception if the storage is locked already or cannot be created.
+Save config for created storage, if storage exists ignore parameter and load config from the disk.
+
+Only one process can work with the storage. It is guaranteed by .lock file.
 
 **Parameters**:
 
 - path to the storage directory.
 - configuration options - ignored if storage exists.
-
-**Return**:
-
-- `std::shared_ptr<Storage>`: a shared pointer to the storage instance.
 
 ### put
 
@@ -144,7 +143,7 @@ Insert or update a value by key, with an optional time-to-live (TTL) for automat
 Throws an exception if error occurs during insertion.
 **Parameters**:
 
-- key: UTF-8 string, maximum length 65535 bytes.
+- key: UTF-8 string, maximum length 1024 bytes.
 - value: fixed-size integral types, float, double, unicode string, arbitrary sequence of bytes.
   value + key length must not exceed block size minus 7 bytes.
 
@@ -157,7 +156,11 @@ Retrieve the value by key. Returns an optional value, which is empty if the key 
 - `std::optional<Entry>`: the value associated with the key, or std::nullopt if not found or expired.
 
 ```
- using Value = std::variant<
+using Value = std::variant<
+    uint8_t,
+    int8_t,
+    uint16_t,
+    int16_t,
     uint32_t,
     int32_t,
     uint64_t,
@@ -165,11 +168,15 @@ Retrieve the value by key. Returns an optional value, which is empty if the key 
     float,
     double,
     std::string,
+    std::u8string,
     std::vector<uint8_t>
-    >;
+>;
 
-
-  enum class ValueType : uint8_t {
+enum class ValueType : sst::datablock::ValueTypeFieldType {
+    UINT8 = 0,
+    INT8,
+    UINT16,
+    INT16,
     UINT32,
     INT32,
     UINT64,
@@ -177,13 +184,15 @@ Retrieve the value by key. Returns an optional value, which is empty if the key 
     FLOAT,
     DOUBLE,
     STRING,
-    BLOB
-   };
+    U8STRING,
+    BLOB,
+    REMOVED = std::numeric_limits<sst::datablock::ValueTypeFieldType>::max(),
+};
 
-   struct Entry {
+struct Entry {
     ValueType type;
     Value value;
-  };
+};
 ```
 
 ### keysWithPrefix
@@ -198,7 +207,7 @@ Retrieve a list of keys that start with the specified prefix. Optionally, limit 
 
 - `std::vector<std::string>`: a vector of keys that match the prefix.
 
-### delete
+### remove
 
 Logically delete a value by key. If the key does not exist, it does nothing. Does not delete the data, just marks it as deleted.
 
@@ -228,7 +237,7 @@ Shrink the storage by removing all the keys marked as deleted and compacting the
 
 ```cpp
 // Open or create storage
-auto db = SimpleStorage::open(const std::string& path);
+auto db = SimpleStorage(const std::string& path);
 
 // Insert value with optional TTL (time-to-live seconds)
 bool put(const std::string& key, const std::vector<uint8_t>& value, std::optional<uint64_t> ttl = std::nullopt);
@@ -236,8 +245,8 @@ bool put(const std::string& key, const std::vector<uint8_t>& value, std::optiona
 // Get value
 std::optional<Entry> get(const std::string& key);
 
-// Delete value
-bool delete(const std::string& key);
+// Remove value
+bool remove(const std::string& key);
 
 // Check if key exists
 bool exists(const std::string& key);
@@ -248,9 +257,82 @@ std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int 
 // Force flush all data to disk
 void flush();
 
-// Shrink storage to remove deleted keys and compact data
+// Shrink storage to remove deleted keys 
 void shrink();
 ```
+---
+# Thread Safety and Synchronization
+
+
+The key-value storage is **thread-safe** as long as **a single instance of `SimpleStorage` is used per storage path**. If multiple instances are created for the same path, **thread safety is not guaranteed** and data corruption may occur.
+
+### Core Synchronization Mechanisms
+
+The library uses the following primitives for internal synchronization:
+
+* **One `std::shared_mutex`** (`readwrite_mutex_`) for concurrent access control. Protect all in-memory changes.
+* **One asynchronous worker thread with a `std::queue` and condition variable**, used for background tasks (e.g., merge, shrink, deferred remove).
+The queue guaranties that only one thread is performing any file operation. The only exception is flush() operation that can be procesed safely without
+queue because it only creates new file with its unique id wich will be ignored by all the async tasks sheduled earlier. File-rename operations are fast and involves in-memroty chages, so they processed under readwrite_mutex_ 
+
+### Fast Operations
+
+The following operations are considered **fast** and acquire **locks briefly**:
+
+* `put`
+* `flush`
+* `readWithPrefix`
+
+These operations use the shared `readwrite_mutex_`:
+
+* **`put`, `flush`** acquire an **exclusive lock**.
+* **`get`, `keysWithPrefix`** acquire a **shared lock**.
+
+### Internal Behavior of Operations
+
+#### `put`
+
+* Writes data to `MemTable` under exclusive lock.
+* May trigger an automatic `flush()` if `MemTable` becomes full.
+
+#### `flush`
+
+* Transfers entries from `MemTable` to disk under exclusive lock.
+* May trigger an **asynchronous `merge`** to deeper levels via the task queue.
+
+#### `merge` (Asynchronous)
+
+* Heavy data processing (reading immutable files, generating temporary files) is done **without any locks**.
+* Final steps—**file renaming and registration**—are protected with **exclusive lock**.
+
+#### `shrink` (Asynchronous)
+
+* Similar to `merge`: performs file compaction off the lock.
+* Acquires **exclusive lock** only briefly for atomic renaming and cleanup.
+
+#### `remove`
+
+* Tries to remove the key directly from `MemTable` under **exclusive lock**.
+* If the key is not found, it defers a background task to **mark the key as `REMOVED`** in SST files using:
+
+  * Asynchronous queue.
+  * **Exclusive lock** for fast in-place mark.
+
+---
+
+## Operation Synchronization Table
+
+| Operation           | Lock Type                | Additional Notes                                |
+| ------------------- | ------------------------ | ----------------------------------------------- |
+| `get`               | `shared_lock`            | Reads only, fast and parallelizable             |
+| `keysWithPrefix`    | `shared_lock`            | Reads only, optimized for prefix scans          |
+| `put`               | `exclusive_lock`         | May trigger `flush()`                           |
+| `flush()`           | `exclusive_lock`         | May schedule async `merge()`                    |
+| `remove` (MemTable) | `exclusive_lock`         | Immediate removal if key is present             |
+| `remove` (SST)      | Queue + `exclusive_lock` | Marks key as `REMOVED` in SST files             |
+| `merge`             | Queue + `exclusive_lock` | Heavy part async, lock held for rename/register |
+| `shrink`            | Queue + `exclusive_lock` | Similar to `merge`, lock only for final step    |
+
 
 ---
 # Building and Running tests
