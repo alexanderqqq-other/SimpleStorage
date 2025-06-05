@@ -91,9 +91,9 @@ TEST_F(SimpleStorageTest, LargeVolume_Merge) {
     // Adjust the config to force small memtable and small L0 threshold,
     // so that many SST files are created and merged.
     Config localConfig;
-    localConfig.memtable_size_bytes = 1 * 1024 * 1024;  // 1 MB memtable
+    localConfig.memtable_size_bytes = 4 * 1024 * 1024;  // 1 MB memtable
     localConfig.l0_max_files = 3;                       // Merge after 3 SST files
-    localConfig.block_size = 64 * 1024;                  // 64 KB data block size
+    localConfig.block_size = 256 * 1024;                  // 256 KB data block size
     // Generate a value of ~1 KB, so ~1024 entries fill ~1 MB.
     std::string value(1024, 'x');
 

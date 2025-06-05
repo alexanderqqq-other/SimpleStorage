@@ -162,7 +162,7 @@ public:
         SSTBuilder builder(sst_path, max_datablock_size, seq_num);
         for (auto it = begin; it != end; ++it) {
             const auto& val = *it;
-            if (keep_removed || (val.second.entry.type != ValueType::REMOVED && Utils::isExpired(val.second.expiration_ms))) {
+            if (keep_removed || (val.second.entry.type != ValueType::REMOVED && !Utils::isExpired(val.second.expiration_ms))) {
                 builder.addEntry(val.first, val.second.entry, val.second.expiration_ms);
             }
         }

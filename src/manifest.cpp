@@ -7,7 +7,6 @@ constexpr std::string_view manifest_filename = "manifest.json";
 constexpr std::string_view expected_type = "SimpleStorage";
 Manifest::Manifest(const std::filesystem::path& path, const Config& config):
     data_dir_(path), config_(config) {
-    validateConfig(config_);
     if (!std::filesystem::exists(data_dir_)) {
         std::filesystem::create_directories(data_dir_);
     }
@@ -47,6 +46,8 @@ Manifest::Manifest(const std::filesystem::path& path, const Config& config):
 
     }
     else {
+        validateConfig(config_);
+
         nlohmann::json j;
         j["type"] = std::string(expected_type);
         j["memtable_size_bytes"] = config_.memtable_size_bytes;

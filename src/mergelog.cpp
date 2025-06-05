@@ -1,4 +1,4 @@
-#include "MergeLog.h"
+#include "mergelog.h"
 #include <fstream>
 #include <stdexcept>
 #include <nlohmann/json.hpp>
