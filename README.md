@@ -359,6 +359,7 @@ environment variables for performance test:
 PERF_TOTAL_SIZE_MB = 10 # Set total size in MB for performance tests, default is 10MB
 PERF_BLOCK_SIZE_KB = 32 # Set block size in KB for performance tests, default is 32KB
 PERF_THREADS = 8 # Set number of threads for performance tests, default is 8
+PERF_MEMTABLE_SIZE_MB = 64 # Set memtable size in MB for performance tests, default is 64MB
 
 Test use random pseudo-random data, uncluding huge BLOBs with size ~10kb. So minimum recommended block size is 16kb
 

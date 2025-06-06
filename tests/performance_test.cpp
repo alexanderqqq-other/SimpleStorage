@@ -53,9 +53,10 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     size_t num_threads = envToSizeT("PERF_THREADS", std::thread::hardware_concurrency());
     if (num_threads == 0) num_threads = 4;
     size_t block_size = envToSizeT("PERF_BLOCK_SIZE_KB", 32 * 1024);
+    uint64_t memtable_size = envToSizeT("PERF_MEMTABLE_SIZE_MB", 64);
 
     Config config;
-    config.memtable_size_bytes = 64ull * 1024 * 1024; // default 64MB
+    config.memtable_size_bytes = memtable_size * 1024 * 1024; // default 64MB
     config.l0_max_files = 4;
     config.block_size = block_size;
     config.shrink_timer_minutes = 0;
@@ -114,13 +115,15 @@ TEST(PerformanceTest, HighLoadMultiThread) {
         }
     }
     db->flush();
-    db->waitAllAsync();
 
     auto write_end = steady_clock::now();
 
     double write_seconds = duration<double>(write_end - write_start).count();
     std::cout << "Written " << entries_written.load() << " entries with total " << bytes_written.load() << " bytes in " << write_seconds << " seconds using " << num_threads << " threads\n";
     std::cout << "Total size on disk: " << get_directory_size_mb_str(temp_dir) << "\n";
+    std::cout << "Merge still in progress";
+
+
     size_t total_entries = entries_written.load();
 
     std::atomic<size_t> read_counter{ 0 };
@@ -158,8 +161,15 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     double read_seconds = duration<double>(read_end - read_start).count();
 
-    std::cout << "Read " << total_entries << " entries in " << read_seconds << " seconds using " << num_threads << " threads\n";
+    std::cout << "Read while merging " << total_entries << " entries in " << read_seconds << " seconds using " << num_threads << " threads\n";
     std::cout << "Total size on disk after read: " << get_directory_size_mb_str(temp_dir) << "\n";
+
+    std::cout << "Waiting for merge to complete...\n";
+    auto meger_start = steady_clock::now();
+    db->waitAllAsync();
+    std::cout << "Merge time: " << duration<double>(steady_clock::now() - meger_start).count() << " seconds\n";
+    std::cout << "Total size on disk after merge: " << get_directory_size_mb_str(temp_dir) << "\n";
+
     // Prefix search timings for a few ranges
     auto prefix_start = steady_clock::now();
     for (int i = 0; i < 10; ++i) {
