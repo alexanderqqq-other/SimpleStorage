@@ -20,6 +20,7 @@ public:
     uint64_t maxSeqNum() const override {
         return sst_files_.empty() ? 0 : sst_files_.back()->seqNum();
     }
+    size_t count() const override;
 
 private:
     std::filesystem::path path_;

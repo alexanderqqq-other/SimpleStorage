@@ -194,3 +194,7 @@ IFileLevel::MergeResult GeneralLevel::shrink(uint32_t datablock_size) {
     }
     return result;
 }
+
+size_t GeneralLevel::count() const{
+    return file_path_map_.size();
+}

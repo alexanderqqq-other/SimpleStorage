@@ -322,6 +322,16 @@ void SimpleStorage::handleRemoveSST(const RemoveSSTTask& t) {
 }
 
 void SimpleStorage::handleShrink(const ShrinkTask&) {
+    GeneralLevel* last_level = nullptr;
+    for (int i = levels_.size() - 1; i > 1; --i) {
+        if (static_cast<GeneralLevel*>(levels_[i].get())->count() == 0) {
+            continue; // Skip empty levels
+        }
+        last_level = static_cast<GeneralLevel*>(levels_[i].get());
+    }
+    if (!last_level) {
+        return; // No levels to shrink
+    }
     auto* last_level = static_cast<GeneralLevel*>(levels_.back().get());
     auto merge_result = last_level->shrink(manifest_.getConfig().block_size);
     MergeLog merge_log(data_dir_ / merge_log_name);

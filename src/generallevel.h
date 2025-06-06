@@ -24,6 +24,8 @@ public:
         return seq_num_map_.empty() ? 0 : (*seq_num_map_.rbegin()->second)->seqNum();
     }
     MergeResult shrink(uint32_t datablock_size);
+    size_t count() const override;
+
 private:
 
     std::filesystem::path path_;

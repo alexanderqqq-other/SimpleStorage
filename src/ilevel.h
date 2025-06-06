@@ -31,4 +31,5 @@ public:
     virtual void removeSSTs(const std::vector<std::filesystem::path>& sst_paths) = 0;
     virtual uint64_t maxSeqNum() const = 0;
     virtual void clearCache() noexcept = 0;
+    virtual size_t count() const = 0;
 };

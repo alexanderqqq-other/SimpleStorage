@@ -106,3 +106,7 @@ void LevelZero::clearCache() noexcept {
         sst->clearCache();
     }
 }
+
+size_t LevelZero::count() const {
+    return sst_files_.size();
+}

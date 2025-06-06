@@ -22,9 +22,7 @@ uint64_t mix(uint64_t x) {
 }
 
 std::string pseudo_random_string(uint64_t i, int length = 10) {
-    const char charset[] = "abcdefghijklmnopqrstuvwxyz"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "0123456789";
+    const char charset[] = "abcdefghijklmnopqrstuvwxyz";
     const int charset_size = sizeof(charset) - 1; // exclude null terminator
 
     std::string result;

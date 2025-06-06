@@ -121,7 +121,7 @@ struct Entry {
 
 
 struct Config {
-    size_t memtable_size_bytes = 64 * 1024 * 1024; //64 MB
+    size_t memtable_size_bytes = 32 * 1024 * 1024; //64 MB
     size_t l0_max_files = 4; 
     size_t block_size = 32 * 1024; //32 KB default block size
     uint32_t shrink_timer_minutes = 0; // 0 means disabled

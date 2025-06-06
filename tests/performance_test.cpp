@@ -46,7 +46,7 @@ namespace {
 
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
-    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 10); // default 1GB
+    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 1000); // default 1GB
     uint64_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
@@ -56,7 +56,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     Config config;
     config.memtable_size_bytes = 64ull * 1024 * 1024; // default 64MB
-    config.l0_max_files = 8;
+    config.l0_max_files = 4;
     config.block_size = block_size;
     config.shrink_timer_minutes = 0;
 
