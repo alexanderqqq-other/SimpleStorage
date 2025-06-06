@@ -159,9 +159,7 @@ TEST_F(SSTFileTest, EmptyFile_NoEntries) {
     std::vector<std::pair<std::string, TestEntry>> empty;
     {
         auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, empty.begin(), empty.end());
-
-        auto val = file->get("anykey");
-        EXPECT_FALSE(val.has_value());
+        EXPECT_FALSE(file);
     }
     EXPECT_FALSE(fs::exists(TMP_SST_PATH));
     SUCCEED();
