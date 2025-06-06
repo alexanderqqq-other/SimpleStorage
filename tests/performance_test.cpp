@@ -16,7 +16,11 @@ std::string get_directory_size_mb_str(const std::filesystem::path& dir_path) {
     if (std::filesystem::exists(dir_path) && std::filesystem::is_directory(dir_path)) {
         for (const auto& entry : std::filesystem::recursive_directory_iterator(dir_path)) {
             if (std::filesystem::is_regular_file(entry.status())) {
-                size += std::filesystem::file_size(entry.path());
+                std::error_code ec;
+                auto sz = std::filesystem::file_size(entry.path(), ec);
+                if (!ec) {
+                    size += sz;
+                }
             }
         }
     }
@@ -74,6 +78,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     std::vector<std::thread> workers;
     std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
     std::vector<std::exception_ptr> exceptions(num_threads);
+    std::cout << "Starting write with " << num_threads << " threads, target size: " << total_mb << " MB\n";
     for (size_t t = 0; t < num_threads; ++t) {
         workers.emplace_back([&, t]() {
             try {
@@ -121,8 +126,8 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     double write_seconds = duration<double>(write_end - write_start).count();
     std::cout << "Written " << entries_written.load() << " entries with total " << bytes_written.load() << " bytes in " << write_seconds << " seconds using " << num_threads << " threads\n";
     std::cout << "Total size on disk: " << get_directory_size_mb_str(temp_dir) << "\n";
-    std::cout << "Merge still in progress";
-
+    std::cout << "Merge still in progress\n";
+    std::cout << "Starting read while merging...\n";
 
     size_t total_entries = entries_written.load();
 
