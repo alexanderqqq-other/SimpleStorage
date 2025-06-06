@@ -233,6 +233,9 @@ void SimpleStorage::workerLoop(std::stop_token stop_token) {
         StorageTask task;
         {
             std::unique_lock lock(queue_mutex_);
+            if (task_queue_.empty()) {
+                queue_empty_cv_.notify_all();
+            }
             queue_cv_.wait(lock, [this, &stop_token] {
                 return !task_queue_.empty() || stop_token.stop_requested();
                 });
@@ -257,7 +260,7 @@ void SimpleStorage::workerLoop(std::stop_token stop_token) {
             else if constexpr (std::is_same_v<T, ShrinkTask>) {
                 handleShrink(t);
             }
-            }, task);
+        }, task);
     }
 }
 
@@ -336,4 +339,11 @@ void SimpleStorage::shrink() {
     std::lock_guard lock(queue_mutex_);
     task_queue_.push(ShrinkTask{});
     queue_cv_.notify_one();
+}
+
+void SimpleStorage::waitAllAsync() {
+    std::unique_lock lock(queue_mutex_);
+    queue_empty_cv_.wait(lock, [this] {
+        return task_queue_.empty();
+      });
 }

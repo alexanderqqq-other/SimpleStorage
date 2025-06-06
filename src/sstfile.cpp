@@ -312,7 +312,3 @@ std::vector<SSTFile> SSTFile::merge(
     result.push_back(builder.finalize());
     return result;
 }
-
-
-
-

@@ -259,6 +259,9 @@ void flush();
 
 // Shrink storage to remove deleted keys 
 void shrink();
+
+// Wait until all background tasks are finished
+void waitAllAsync();
 ```
 ---
 # Thread Safety and Synchronization
@@ -319,6 +322,10 @@ By default value is 0, which means shrink timer is disabled.
 
   * Asynchronous queue.
   * **Exclusive lock** for fast in-place mark.
+  * 
+### waitAllAsync
+
+Block the current thread until all queued background tasks are processed.
 
 ---
 

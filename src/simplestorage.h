@@ -67,7 +67,7 @@ public:
 
     void flush();
     void shrink();
-
+    void waitAllAsync();
 private:
     void putImpl(const std::string& key, const Entry& entry, uint64_t ttl);
     void flushImpl();
@@ -87,6 +87,7 @@ private:
     mutable std::shared_mutex readwrite_mutex_; 
     mutable std::mutex queue_mutex_; 
     std::condition_variable queue_cv_;
+    std::condition_variable queue_empty_cv_;
     std::queue<StorageTask> task_queue_;
     std::jthread worker_thread_;
     std::jthread shrink_timer_thread_;
@@ -96,4 +97,3 @@ private:
 
     // std::unique_ptr<WAL> wal_;
 };
-

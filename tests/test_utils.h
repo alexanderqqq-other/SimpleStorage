@@ -21,7 +21,7 @@ uint64_t mix(uint64_t x) {
     return x;
 }
 
-std::string pseudo_random_string(int i) {
+std::string pseudo_random_string(uint64_t i) {
     const int length = 10;
     const char charset[] = "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
@@ -37,6 +37,78 @@ std::string pseudo_random_string(int i) {
     }
     return result;
 }
+
+std::u8string pseudo_unicode_string(uint64_t i) {
+    const int length = 10;
+    const char charset[] = "АБВГДЕЁЖЗИКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзиклмнопрстуфхцчшщъыьэюя";
+    const int charset_size = sizeof(charset) - 1; // exclude null terminator
+
+    std::u8string result;
+    uint64_t hash = mix(static_cast<uint64_t>(i));
+    for (int j = 0; j < length; ++j) {
+        // Further mix for each character
+        uint64_t h = mix(hash + j * 0x123456789ABCDEF);
+        result += charset[h % charset_size];
+    }
+    return result;
+}
+
+
+Entry pseudo_random_value(uint64_t i) {
+    uint64_t hash = mix(static_cast<uint64_t>(i));
+    ValueType type = static_cast<ValueType>(hash % static_cast<uint64_t>(ValueType::BLOB));
+    Value val;
+    switch (type) {
+    case ValueType::UINT8:
+        val = static_cast<uint8_t>(hash % std::numeric_limits<uint8_t>::max());
+        break;
+    case ValueType::INT8:
+        val = static_cast<int8_t>(hash % std::numeric_limits<int8_t>::max());
+        break;
+    case ValueType::UINT16:
+        val = static_cast<uint16_t>(hash % std::numeric_limits<uint16_t>::max());
+        break;
+    case ValueType::INT16:
+        val = static_cast<int16_t>(hash % std::numeric_limits<int16_t>::max());
+        break;
+    case ValueType::UINT32:
+        val = static_cast<uint32_t>(hash % std::numeric_limits<uint32_t>::max());
+        break;
+    case ValueType::INT32:
+        val = static_cast<int32_t>(hash % std::numeric_limits<int32_t>::max());
+        break;
+    case ValueType::UINT64:
+        val = static_cast<uint64_t>(hash % std::numeric_limits<uint64_t>::max());
+        break;
+    case ValueType::INT64:
+        val = static_cast<int64_t>(hash % std::numeric_limits<int64_t>::max());
+        break;
+    case ValueType::FLOAT:
+        val = static_cast<float>(hash % 10000) / 100.0f; // Example float value
+        break;
+    case ValueType::DOUBLE:
+        val = static_cast<double>(hash % 100000) / 1000.0; // Example double value
+        break;
+    case ValueType::STRING:
+        val = pseudo_random_string(hash);
+        break;
+    case ValueType::U8STRING:
+        val = pseudo_unicode_string(hash);
+        break;
+    case ValueType::BLOB:
+    {
+        std::vector<uint8_t> blob(hash % BIG_BLOB_SIZE, static_cast<uint8_t>(hash % 256));
+        val = blob;
+    }
+        break;
+    case ValueType::REMOVED:
+        break;
+    default:
+        break;
+    }
+    return Entry{ type, val };
+}
+
 
 inline std::vector<std::pair<std::string, TestEntry>> generateBigData() {
     std::vector<std::pair<std::string, TestEntry>> items;

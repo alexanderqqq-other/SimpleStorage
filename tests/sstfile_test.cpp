@@ -290,6 +290,40 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
     SUCCEED();
 }
 
+TEST_F(SSTFileTest, Shrink_RemovesDeletedEntries) {
+    std::vector<std::pair<std::string, TestEntry>> items = {
+        {"a", TestEntry{Entry{ValueType::STRING, std::string("one")}, 0}},
+        {"b", TestEntry{Entry{ValueType::STRING, std::string("two")}, 0}},
+        {"c", TestEntry{Entry{ValueType::STRING, std::string("three")}, 0}}
+    };
+    std::sort(items.begin(), items.end(), [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
+
+    auto orig_path = temp_dir / "shrink_src.vsst";
+    SSTFile file = SSTFile::writeAndCreate(orig_path, BLOCK_SIZE, 0, true, items.begin(), items.end());
+
+    ASSERT_TRUE(file.remove("b"));
+    auto removed = file.get("b");
+    ASSERT_TRUE(removed.has_value());
+    EXPECT_EQ(removed->type, ValueType::REMOVED);
+
+    auto orig_size = fs::file_size(file.path());
+
+    SSTFile shrunk = file.shrink(BLOCK_SIZE);
+
+    EXPECT_TRUE(fs::exists(shrunk.path()));
+    EXPECT_LT(fs::file_size(shrunk.path()), orig_size);
+
+    EXPECT_FALSE(shrunk.get("b").has_value());
+
+    auto v = shrunk.get("a");
+    ASSERT_TRUE(v.has_value());
+    EXPECT_EQ(std::get<std::string>(v->value), "one");
+    v = shrunk.get("c");
+    ASSERT_TRUE(v.has_value());
+    EXPECT_EQ(std::get<std::string>(v->value), "three");
+}
+
+
 
 TEST_F(SSTFileTest, RemoveEntry_WorksAsExpected) {
     std::vector<std::pair<std::string, TestEntry>> items = {

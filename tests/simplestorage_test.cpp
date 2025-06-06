@@ -122,7 +122,7 @@ TEST_F(SimpleStorageTest, LargeVolume_Merge) {
         EXPECT_FALSE(db->get("nonexistent_key").has_value());
 
         // Allow background merge tasks to complete.
-        std::this_thread::sleep_for(std::chrono::seconds(5));
+        db->waitAllAsync();
 
         //// Verify a few sample keys are retrievable with correct values.
         for (size_t i = 0; i < num_entries; i+=17) {
