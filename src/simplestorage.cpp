@@ -332,7 +332,6 @@ void SimpleStorage::handleShrink(const ShrinkTask&) {
     if (!last_level) {
         return; // No levels to shrink
     }
-    auto* last_level = static_cast<GeneralLevel*>(levels_.back().get());
     auto merge_result = last_level->shrink(manifest_.getConfig().block_size);
     MergeLog merge_log(data_dir_ / merge_log_name);
     for (const auto& sst : merge_result.new_files) {
