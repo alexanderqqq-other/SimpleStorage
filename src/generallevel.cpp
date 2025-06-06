@@ -24,6 +24,11 @@ namespace {
         if (it == sst_file_map.begin() || (it != sst_file_map.end() && it->second->maxKey() < key)) {
             return lru_end;
         }
+
+        if (it != sst_file_map.end() && it->first == key) {
+            return it->second; // Found exact match
+        }
+
         --it;
         lru_sst_files.splice(lru_end, lru_sst_files, it->second); // Move to the end of the list
         return it->second;

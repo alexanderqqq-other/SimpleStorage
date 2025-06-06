@@ -41,18 +41,11 @@ namespace {
         try { return std::stoull(v); }
         catch (...) { return defValue; }
     }
-
-    size_t valueSizeForId(size_t id) {
-        // Cycle through different value sizes: 1KB, 4KB, 16KB, 64KB, 256KB, 1MB
-        static const size_t sizes[] = { 1024, 4096, 16384, 65536, 262144, 1048576 };
-        return sizes[id % (sizeof(sizes) / sizeof(sizes[0]))];
-    }
-
 }
 
-TEST(PerformanceTest, DISABLED_HighLoadMultiThread) {
+TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
-    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 1024); // default 1GB
+    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 1); // default 1GB
     size_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
@@ -80,16 +73,17 @@ TEST(PerformanceTest, DISABLED_HighLoadMultiThread) {
         workers.emplace_back([&, t]() {
             while (true) {
                 size_t id = id_counter.fetch_add(1);
-                size_t size = valueSizeForId(id);
+                std::string key = pseudo_random_string(id) + std::to_string(id);
+                auto entry = pseudo_random_value(id);
+                size_t size = Utils::onDiskEntrySize(key, entry.value);
                 size_t current = bytes_written.fetch_add(size);
                 if (current >= total_bytes_target) {
                     break;
                 }
-                std::string key = pseudo_random_string(id) + std::to_string(id);
-                auto entry = pseudo_random_value(id);
-                std::visit([&db, &key](auto&& arg) mutable {
+
+                std::visit([&db, &key, id](auto&& arg) mutable {
                     using T = std::decay_t<decltype(arg)>;
-                    db->put(key, arg);
+                    db->put(key, arg, id % 10 == 0 ? 1 : 0);
                     }, entry.value);
 
 
@@ -161,9 +155,11 @@ TEST(PerformanceTest, DISABLED_HighLoadMultiThread) {
     std::cout << "Total size on disk after remove: " << get_directory_size_mb_str(temp_dir) << "\n";
     auto shrink_start = steady_clock::now();
     db->shrink();
+    db->waitAllAsync();
     auto shrink_end = steady_clock::now();
     double shrink_seconds = duration<double>(shrink_end - shrink_start).count();
     std::cout << "Shrink completed in " << shrink_seconds << " seconds\n";
     std::cout << "Final size on disk: " << get_directory_size_mb_str(temp_dir) << "\n";
+    SUCCEED();
 }
 

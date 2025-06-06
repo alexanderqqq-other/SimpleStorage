@@ -15,6 +15,7 @@ FetchContent_Declare(
   googletest
   DOWNLOAD_EXTRACT_TIMESTAMP ON
   URL https://github.com/google/googletest/archive/refs/tags/v1.17.0.zip
+  DOWNLOAD_EXTRACT_TIMESTAMP ON
 )
 set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of googletest")
 FetchContent_MakeAvailable(googletest)
@@ -25,6 +26,7 @@ FetchContent_MakeAvailable(googletest)
 FetchContent_Declare(
   nlohmann_json
   URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+  DOWNLOAD_EXTRACT_TIMESTAMP ON
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
@@ -58,7 +60,7 @@ foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src} "src/utils.cpp")
     target_link_libraries(${test_name} PRIVATE simplestorage_lib gtest_main)
-    if(test_name STREQUAL "performance_test")
+    if(${test_name} STREQUAL "performance_test")
         gtest_discover_tests(
             ${test_name}
             PROPERTIES LABELS "perf" EXCLUDE_FROM_DEFAULT TRUE
@@ -66,5 +68,4 @@ foreach(test_src ${TEST_SOURCES})
     else()
         gtest_discover_tests(${test_name})
     endif()
-    message(${test_name})
 endforeach()
