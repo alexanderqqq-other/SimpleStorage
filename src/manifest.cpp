@@ -78,7 +78,7 @@ void Manifest::validateConfig(const Config& config) const {
     }
     if (config.l0_max_files < sst::MIN_L0_NUM_FILES ) {
         throw std::invalid_argument("Invalid L0 max files: " + std::to_string(config.l0_max_files) +
-            ". Must be between greater than" + std::to_string(sst::MIN_L0_NUM_FILES));
+            ". Must be between greater than " + std::to_string(sst::MIN_L0_NUM_FILES));
     }
     if (config.block_size < sst::MIN_BLOCK_SIZE || config.block_size > sst::MAX_BLOCK_SIZE) {
         throw std::invalid_argument("Invalid block size: " + std::to_string(config.block_size) +

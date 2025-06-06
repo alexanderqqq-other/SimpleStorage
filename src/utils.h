@@ -77,5 +77,4 @@ namespace Utils {
         return key.size() + onDiskSize(value) + sst::datablock::MIN_ENTRY_SIZE +
             sst::datablock::OFFSET_ENTRY_SIZE;
     }
-
 }

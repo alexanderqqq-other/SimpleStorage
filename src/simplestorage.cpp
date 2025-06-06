@@ -9,6 +9,8 @@
 #include <format>
 #include <unordered_set>
 #include <unordered_map>
+#include <algorithm>
+#include <filesystem>
 namespace {
     constexpr std::string_view level0_name = "level0";
     constexpr std::string_view levelN_prefix = "level";
@@ -42,21 +44,28 @@ namespace {
         return levels;
     }
 }
-uint64_t SimpleStorage::sst_sequence_number = 0; 
+uint64_t SimpleStorage::sst_sequence_number = 0;
 
 SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config& config)
     : manifest_(data_dir, config), data_dir_(data_dir),
-    worker_thread_([this](std::stop_token st) { workerLoop(st); }), lock_file_(data_dir / lock_file_name){
+    worker_thread_([this](std::stop_token st) { workerLoop(st); }), lock_file_(data_dir / lock_file_name) {
     const auto& real_config = manifest_.getConfig();
     MergeLog merge_log(data_dir_ / merge_log_name);
-    for (const auto& path: merge_log.filesToRemove()) {
+    for (const auto& path : merge_log.filesToRemove()) {
         std::filesystem::remove(path);
+    }
+    sst_sequence_number = 0;
+    for (const auto& entry : std::filesystem::recursive_directory_iterator(data_dir_)) {
+        if (entry.is_regular_file() && entry.path().extension() == ".vsst") {
+            auto sst = SSTFile::readAndCreate(entry.path());
+            sst_sequence_number = std::max(sst_sequence_number, sst.seqNum());
+        }
     }
     levels_.push_back(std::make_unique<MemTable>(real_config.memtable_size_bytes)); // First level is MemTable
     levels_.push_back(std::make_unique<LevelZero>(data_dir / level0_name, real_config.l0_max_files)); // Level 0 of the storage
     auto nonzero_level_config = generateLevelConfigs(real_config.memtable_size_bytes, real_config.l0_max_files);
     int i = 1;
-    for (const auto&lc: nonzero_level_config) {
+    for (const auto& lc : nonzero_level_config) {
         levels_.push_back(std::make_unique<GeneralLevel>(data_dir / (levelN_prefix.data() + std::to_string(i++)),
             lc.max_file_size, lc.max_num_files, lc.is_last)); // Level 1+
     }
@@ -167,7 +176,7 @@ void SimpleStorage::putImpl(const std::string& key, const Entry& entry, uint64_t
 void SimpleStorage::flushImpl() {
     std::vector<SSTFile> ssts;
     ssts.push_back(SSTFile::writeAndCreate(data_dir_ / std::filesystem::path(memtable_name),
-        manifest_.getConfig().block_size, 
+        manifest_.getConfig().block_size,
         ++sst_sequence_number, true,
         memTable()->begin(), memTable()->end()));
     auto* l = static_cast<IFileLevel*>(levels_[1].get());
@@ -268,9 +277,9 @@ void SimpleStorage::handleMergeTask(const MergeTask& t) {
         return; // Nothing to merge
     }
     //use merge log to complete merge in case of abnormal termination
-    MergeLog merge_log(data_dir_/merge_log_name);
+    MergeLog merge_log(data_dir_ / merge_log_name);
     uint64_t seq_num = 0;
-    for(const auto& sst_path: files_to_merge) {
+    for (const auto& sst_path : files_to_merge) {
         auto merge_result = next_level->mergeToTmp(sst_path, manifest_.getConfig().block_size);
         merge_log.addToRemove(sst_path);
         for (const auto& sst : merge_result.new_files) {
@@ -289,7 +298,7 @@ void SimpleStorage::handleMergeTask(const MergeTask& t) {
         }
         merge_log.removeFiles();
     }
-    if (dst_level < levels_.size()  - 1) {
+    if (dst_level < levels_.size() - 1) {
         mergeAsync(dst_level, seq_num); // Schedule the next level merge if needed
     }
 }

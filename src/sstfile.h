@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include <bit>
 #include <filesystem>
 #include <fstream>
