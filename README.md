@@ -351,6 +351,8 @@ cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
 cmake --build . --config Release
 ctest 
+(optional) SET PERF_TOTAL_SIZE_MB = 1024 # Set total size in MB for performance tests, default is 10MB
+ctest -V -L perf //performance tests only
 ```
 
 

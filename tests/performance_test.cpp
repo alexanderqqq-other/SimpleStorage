@@ -45,12 +45,12 @@ namespace {
 
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
-    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 1); // default 1GB
+    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 10); // default 1GB
     size_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
     size_t num_threads = envToSizeT("PERF_THREADS", std::thread::hardware_concurrency());
-    if (num_threads == 0) num_threads = 8;
+    if (num_threads == 0) num_threads = 4;
 
     Config config;
     config.memtable_size_bytes = 64ull * 1024 * 1024; // default 64MB
@@ -69,11 +69,12 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     auto write_start = steady_clock::now();
     std::vector<std::thread> workers;
+    std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
     for (size_t t = 0; t < num_threads; ++t) {
         workers.emplace_back([&, t]() {
             while (true) {
                 size_t id = id_counter.fetch_add(1);
-                std::string key = pseudo_random_string(id) + std::to_string(id);
+                std::string key = pseudo_random_string(id) + long_value + std::to_string(id);
                 auto entry = pseudo_random_value(id);
                 size_t size = Utils::onDiskEntrySize(key, entry.value);
                 size_t current = bytes_written.fetch_add(size);

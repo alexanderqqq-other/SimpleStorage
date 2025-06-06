@@ -2,16 +2,26 @@
 #include "utils.h"
 #include <array>
 namespace iblock = sst::indexblock;
+int SSTFile::max_cached_files_ = 10; // Maximum number of cached datablocks
 
 SSTFile::SSTFile(const std::filesystem::path& path, sst::indexblock::OffsetFieldType index_block_offset,
     uint64_t seq_num, const std::string max_key,
     std::vector <std::pair<std::string, iblock::OffsetFieldType>> index_block) :
-    path_(path), index_block_offset_(index_block_offset), index_block_(std::move(index_block)), seq_num_(seq_num), max_key_(max_key){
-}
+    path_(path), index_block_offset_(index_block_offset), index_block_(std::move(index_block)), seq_num_(seq_num), max_key_(max_key) {}
 
 std::vector<uint8_t> SSTFile::readDatablock(iblock::OffsetFieldType block_offset, iblock::OffsetFieldType block_size) const {
-
-    return readDatablock(path_, block_offset, block_size);
+    // SSTFile is not thread-safe, but this is const operation so it can be called concurrently
+    std::lock_guard lock(cache_mutex_);
+    if (datablock_cache_.find(block_offset) != datablock_cache_.end()) {
+        return datablock_cache_[block_offset];
+    }
+    if (datablock_cache_.size() >= max_cached_files_) {
+        // Remove random cached block if we exceed the limit
+        datablock_cache_.erase(datablock_cache_.begin());
+    }
+    auto data = readDatablock(path_, block_offset, block_size);
+    datablock_cache_[block_offset] = std::move(data);
+    return datablock_cache_[block_offset];
 }
 
 std::vector<uint8_t> SSTFile::readDatablock(const std::filesystem::path path, sst::indexblock::OffsetFieldType block_offset, sst::indexblock::OffsetFieldType block_size)
@@ -31,6 +41,7 @@ std::vector<uint8_t> SSTFile::readDatablock(const std::filesystem::path path, ss
 }
 
 void SSTFile::writeDatablock(const DataBlock& block, sst::indexblock::OffsetFieldType offsetIndex) const {
+    datablock_cache_[offsetIndex] = block.data();
     std::fstream ofs(path_, std::ios::in | std::ios::out | std::ios::binary);
     if (!ofs) {
         throw std::runtime_error("Failed to open SST file for writing: " + path_.string());
@@ -56,7 +67,8 @@ sst::indexblock::OffsetFieldType SSTFile::getDatablockSize(decltype(index_block_
     auto next_it = std::next(it);
     if (next_it == index_block_.end()) {
         block_size = index_block_offset_ - it->second;
-    } else {
+    }
+    else {
         block_size = next_it->second - it->second;
     }
     return block_size;
@@ -66,12 +78,12 @@ sst::indexblock::OffsetFieldType SSTFile::getDatablockSize(decltype(index_block_
 std::optional<Entry> SSTFile::get(const std::string& key) const {
     auto it = findDBlockOffset(key);
     if (it == index_block_.end()) {
-        return std::nullopt; 
+        return std::nullopt;
     }
     auto data = readDatablock(it->second, getDatablockSize(it));
     if (data.empty()) {
         return std::nullopt; // No data block found for the key
-    }   
+    }
     DataBlock data_block(std::move(data));
     return data_block.get(key);
 }
@@ -85,6 +97,11 @@ bool SSTFile::remove(const std::string& key)
     auto data = readDatablock(it->second, datablock_size);
     if (data.empty()) {
         return false;
+    }
+    // We don't protect the cache by mutex because remove is not thread-safe operation
+    auto find_it = datablock_cache_.find(it->second);
+    if (find_it != datablock_cache_.end()) {
+        find_it->second = data; // Update the cached block with the latest data
     }
     DataBlock data_block(std::move(data));
     if (data_block.remove(key)) {
@@ -147,8 +164,8 @@ SSTFile SSTFile::readAndCreate(const std::filesystem::path& sst_path) {
     indexblock_size = Utils::deserializeLE<iblock::CountFieldType>(reinterpret_cast<uint8_t*>(&indexblock_size));
     if (filesize < indexblock_size + iblock::INDEX_BLOCK_COUNT_SIZE + sst::header::SST_HEADER_SIZE)
         throw std::runtime_error("File too small for SST index block");
-    auto indexblock_offset = filesize 
-        - static_cast<std::streamoff>(indexblock_size) 
+    auto indexblock_offset = filesize
+        - static_cast<std::streamoff>(indexblock_size)
         - static_cast<std::streamoff>(sizeof(indexblock_size));
 
     ifs.seekg(indexblock_offset, std::ios::beg);
@@ -202,6 +219,11 @@ SSTFile SSTFile::shrink(uint32_t datablock_size) const {
     auto first_out_path = path_.string() + std::string("_cleaned_.tmp");
     return SSTFile::writeAndCreate(first_out_path, datablock_size, seqNum(),
         false, begin(), end());
+}
+
+void SSTFile::clearCache() noexcept {
+    //This operation is not thread-safe
+    datablock_cache_.clear();
 }
 
 std::vector<SSTFile> SSTFile::merge(
@@ -276,14 +298,15 @@ std::vector<SSTFile> SSTFile::merge(
             builder.addEntry(key1, stt_entry1.entry, stt_entry1.expiration_ms);
             ++it1;
         }
-        else if(key1 > key2) {
+        else if (key1 > key2) {
             builder.addEntry(key2, stt_entry2.entry, stt_entry2.expiration_ms);
             ++it2;
         }
         else {
             if (sst1.seqNum() >= dst_files[i].seqNum()) {
                 builder.addEntry(key1, stt_entry1.entry, stt_entry1.expiration_ms);
-            } else {
+            }
+            else {
                 builder.addEntry(key2, stt_entry2.entry, stt_entry2.expiration_ms);
             }
             ++it1;
@@ -297,7 +320,7 @@ std::vector<SSTFile> SSTFile::merge(
         }
         ++it1;
     }
-    while( i < dst_files.size()){
+    while (i < dst_files.size()) {
         if (it2 == dst_files[i].end()) {
             ++i;
             continue;

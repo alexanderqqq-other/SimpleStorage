@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <mutex>
 
 #include "constants.h"
 #include "types.h"
@@ -144,6 +146,7 @@ public:
     std::string maxKey() const;
     static SSTFile readAndCreate(const std::filesystem::path& sst_path);
     SSTFile shrink(uint32_t datablock_size) const;
+    void clearCache() noexcept;
     static std::vector<SSTFile> merge(
         const std::filesystem::path& sst1_path,
         const std::vector<std::filesystem::path>&,
@@ -187,7 +190,12 @@ private:
     uint64_t seq_num_;
     std::string max_key_;
 
+    mutable std::mutex cache_mutex_;
+    mutable std::unordered_map<sst::indexblock::OffsetFieldType, std::vector<uint8_t>> datablock_cache_; // Cache for datablocks by their offset
+    static int max_cached_files_;
     sst::indexblock::OffsetFieldType getDatablockSize(decltype(index_block_)::const_iterator it) const;
 
+
     friend class SSTBuilder;
+
 };
