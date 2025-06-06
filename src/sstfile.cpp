@@ -139,7 +139,7 @@ std::string SSTFile::maxKey() const {
     return max_key_;
 }
 
-SSTFile SSTFile::readAndCreate(const std::filesystem::path& sst_path) {
+std::unique_ptr<SSTFile> SSTFile::readAndCreate(const std::filesystem::path& sst_path) {
     std::ifstream ifs(sst_path, std::ios::binary | std::ios::ate);
     if (!ifs) throw std::runtime_error("Failed to open SST file for reading: " + sst_path.string());
 
@@ -190,7 +190,7 @@ SSTFile SSTFile::readAndCreate(const std::filesystem::path& sst_path) {
 
     auto db = DataBlock(readDatablock(sst_path, offset, indexblock_offset - index_block.back().second));
     auto max_key = db.get(db.count() - 1).first;
-    return SSTFile(sst_path, indexblock_offset, seq_num, max_key, std::move(index_block));
+    return std::unique_ptr<SSTFile>(new SSTFile(sst_path, indexblock_offset, seq_num, max_key, std::move(index_block)));
 }
 
 
@@ -215,7 +215,7 @@ std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsi
     return result;
 }
 
-SSTFile SSTFile::shrink(uint32_t datablock_size) const {
+std::unique_ptr<SSTFile> SSTFile::shrink(uint32_t datablock_size) const {
     auto first_out_path = path_.string() + std::string("_cleaned_.tmp");
     return SSTFile::writeAndCreate(first_out_path, datablock_size, seqNum(),
         false, begin(), end());
@@ -226,7 +226,7 @@ void SSTFile::clearCache() noexcept {
     datablock_cache_.clear();
 }
 
-std::vector<SSTFile> SSTFile::merge(
+std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
     const std::filesystem::path& sst1_path,
     const std::vector<std::filesystem::path>& dst_file_paths,
     const std::filesystem::path& out_dir,
@@ -235,13 +235,13 @@ std::vector<SSTFile> SSTFile::merge(
     bool keep_removed)
 {
     // Read input files
-    SSTFile sst1 = SSTFile::readAndCreate(sst1_path);
+    auto sst1 = SSTFile::readAndCreate(sst1_path);
 
-    std::vector<SSTFile> dst_files;
+    std::vector<std::unique_ptr<SSTFile>>  dst_files;
     if (dst_file_paths.empty()) {
-        auto first_out_path = out_dir / ("merged_" + std::to_string(sst1.seqNum()) + ".tmp");
-        dst_files.push_back(SSTFile::writeAndCreate(first_out_path, datablock_size, sst1.seqNum(),
-            keep_removed, sst1.begin(), sst1.end()));
+        auto first_out_path = out_dir / ("merged_" + std::to_string(sst1->seqNum()) + ".tmp");
+        dst_files.push_back(SSTFile::writeAndCreate(first_out_path, datablock_size, sst1->seqNum(),
+            keep_removed, sst1->begin(), sst1->end()));
         return dst_files;
     }
 
@@ -250,12 +250,12 @@ std::vector<SSTFile> SSTFile::merge(
     for (const auto& dst_file_path : dst_file_paths) {
         dst_files.push_back(SSTFile::readAndCreate(dst_file_path));
     }
-    std::vector<SSTFile> result;
+    std::vector<std::unique_ptr<SSTFile>>  result;
     std::vector<uint64_t> seq_nums;
     seq_nums.reserve(dst_files.size() + 1);
-    seq_nums.push_back(sst1.seqNum());
+    seq_nums.push_back(sst1->seqNum());
     for (const auto& sst : dst_files) {
-        seq_nums.push_back(sst.seqNum());
+        seq_nums.push_back(sst->seqNum());
     }
     std::sort(seq_nums.begin(), seq_nums.end());
     auto seq_num = seq_nums.front();
@@ -263,14 +263,14 @@ std::vector<SSTFile> SSTFile::merge(
     SSTBuilder builder(out_dir / ("merged_" + std::to_string(seq_num) + ".tmp"),
         datablock_size, seq_num);
 
-    auto it1 = sst1.begin();
-    auto it2 = dst_files.front().begin();
+    auto it1 = sst1->begin();
+    auto it2 = dst_files.front()->begin();
     int i = 0;
     int current_seq_index = 0;
-    while (it1 != sst1.end() && i < dst_files.size()) {
-        if (it2 == dst_files[i].end()) {
+    while (it1 != sst1->end() && i < dst_files.size()) {
+        if (it2 == dst_files[i]->end()) {
             ++i;
-            it2 = (i < dst_files.size()) ? dst_files[i].begin() : dst_files.back().end();
+            it2 = (i < dst_files.size()) ? dst_files[i]->begin() : dst_files.back()->end();
             continue;
         }
 
@@ -303,7 +303,7 @@ std::vector<SSTFile> SSTFile::merge(
             ++it2;
         }
         else {
-            if (sst1.seqNum() >= dst_files[i].seqNum()) {
+            if (sst1->seqNum() >= dst_files[i]->seqNum()) {
                 builder.addEntry(key1, stt_entry1.entry, stt_entry1.expiration_ms);
             }
             else {
@@ -313,7 +313,7 @@ std::vector<SSTFile> SSTFile::merge(
             ++it2;
         }
     }
-    while (it1 != sst1.end()) {
+    while (it1 != sst1->end()) {
         auto [key1, stt_entry1] = *it1;
         if (keep_removed || stt_entry1.entry.type != ValueType::REMOVED) {
             builder.addEntry(key1, stt_entry1.entry, stt_entry1.expiration_ms);
@@ -321,7 +321,7 @@ std::vector<SSTFile> SSTFile::merge(
         ++it1;
     }
     while (i < dst_files.size()) {
-        if (it2 == dst_files[i].end()) {
+        if (it2 == dst_files[i]->end()) {
             ++i;
             continue;
         }

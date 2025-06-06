@@ -21,8 +21,7 @@ uint64_t mix(uint64_t x) {
     return x;
 }
 
-std::string pseudo_random_string(uint64_t i) {
-    const int length = 10;
+std::string pseudo_random_string(uint64_t i, int length = 10) {
     const char charset[] = "abcdefghijklmnopqrstuvwxyz"
         "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
         "0123456789";
@@ -56,7 +55,7 @@ std::u8string pseudo_unicode_string(uint64_t i) {
 
 Entry pseudo_random_value(uint64_t i) {
     uint64_t hash = mix(static_cast<uint64_t>(i));
-    ValueType type = static_cast<ValueType>(hash % static_cast<uint64_t>(ValueType::BLOB));
+    ValueType type = static_cast<ValueType>(i % (static_cast<uint64_t>(ValueType::BLOB) + 1));
     Value val;
     switch (type) {
     case ValueType::UINT8:
@@ -97,7 +96,7 @@ Entry pseudo_random_value(uint64_t i) {
         break;
     case ValueType::BLOB:
     {
-        std::vector<uint8_t> blob(hash % BIG_BLOB_SIZE, static_cast<uint8_t>(hash % 256));
+        std::vector<uint8_t> blob(2048 + hash % BIG_BLOB_SIZE, static_cast<uint8_t>(hash % 256));
         val = blob;
     }
         break;

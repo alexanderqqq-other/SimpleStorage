@@ -14,14 +14,14 @@ LevelZero::LevelZero(const std::filesystem::path& path, size_t max_num_files) : 
         }
     }
     std::sort(sst_files_.begin(), sst_files_.end(),
-        [](const SSTFile& a, const SSTFile& b) {
-            return a.seqNum() < b.seqNum();
+        [](const auto& a, const auto& b) {
+            return a->seqNum() < b->seqNum();
         }); 
 }
 
 std::optional<Entry> LevelZero::get(const std::string& key) const {
     for (auto it = sst_files_.rbegin(); it != sst_files_.rend(); ++it) {
-        auto val = it->get(key);
+        auto val = (*it)->get(key);
         if (val.has_value()) {
             return val;
         }
@@ -31,10 +31,10 @@ std::optional<Entry> LevelZero::get(const std::string& key) const {
 
 bool LevelZero::remove(const std::string& key, uint64_t max_seq_num) {
     for (auto& sst : sst_files_) {
-        if( sst.seqNum() > max_seq_num) {
+        if( sst->seqNum() > max_seq_num) {
             continue; // Skip SST files with higher sequence numbers
         }
-        if (sst.remove(key)) {
+        if (sst->remove(key)) {
             return true;
         }
     }
@@ -43,7 +43,7 @@ bool LevelZero::remove(const std::string& key, uint64_t max_seq_num) {
 
 EntryStatus LevelZero::status(const std::string& key) const {
     for (auto it = sst_files_.rbegin(); it != sst_files_.rend(); ++it) {
-        EntryStatus st = it->status(key);
+        EntryStatus st = (*it)->status(key);
         if (st != EntryStatus::NOT_FOUND) {
             return st;
         }
@@ -55,7 +55,7 @@ std::vector<std::string> LevelZero::keysWithPrefix(const std::string& prefix, un
     std::vector<std::string> result;
     result.reserve(max_results);
     for (auto it = sst_files_.rbegin(); it != sst_files_.rend() && result.size() < max_results; ++it) {
-        auto keys = it->keysWithPrefix(prefix, max_results - result.size());
+        auto keys = (*it)->keysWithPrefix(prefix, max_results - result.size());
         result.insert(result.end(),
             std::make_move_iterator(keys.begin()),
             std::make_move_iterator(keys.end()));
@@ -72,8 +72,8 @@ std::vector<std::filesystem::path> LevelZero::filelistToMerge(uint64_t max_seq_n
     }
     std::vector<std::filesystem::path> ret;
     for (const auto& sst : sst_files_) {
-        if (sst.seqNum() <= max_seq_num) {
-            ret.push_back(sst.path());
+        if (sst->seqNum() <= max_seq_num) {
+            ret.push_back(sst->path());
         }
     }
     return ret;
@@ -83,10 +83,10 @@ IFileLevel::MergeResult LevelZero::mergeToTmp(const std::filesystem::path&, size
     throw std::logic_error("Level 0 does not support merging to temporary files. Use Level 1 or higher for merging.");
 }
 
-void LevelZero::addSST(std::vector<SSTFile> ssts) {
+void LevelZero::addSST(std::vector<std::unique_ptr<SSTFile>>  ssts) {
     for (auto& sst : ssts) {
-        auto fname = file_prefix + std::to_string(sst.seqNum()) + file_extension;
-        sst.rename(path_ / fname);
+        auto fname = file_prefix + std::to_string(sst->seqNum()) + file_extension;
+        sst->rename(path_ / fname);
         sst_files_.push_back(std::move(sst));
     }
 }
@@ -94,9 +94,15 @@ void LevelZero::addSST(std::vector<SSTFile> ssts) {
 void LevelZero::removeSSTs(const std::vector<std::filesystem::path>& sst_paths) {
     for (const auto& path : sst_paths) {
         auto it = std::remove_if(sst_files_.begin(), sst_files_.end(),
-            [&path](const SSTFile& sst) { return sst.path() == path; });
+            [&path](const std::unique_ptr<SSTFile>& sst) { return sst->path() == path; });
         if (it != sst_files_.end()) {
             sst_files_.erase(it, sst_files_.end());
         }
+    }
+}
+
+void LevelZero::clearCache() noexcept {
+    for (auto& sst : sst_files_) {
+        sst->clearCache();
     }
 }

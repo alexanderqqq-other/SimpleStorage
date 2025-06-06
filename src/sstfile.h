@@ -144,10 +144,10 @@ public:
     }
     std::string minKey() const;
     std::string maxKey() const;
-    static SSTFile readAndCreate(const std::filesystem::path& sst_path);
-    SSTFile shrink(uint32_t datablock_size) const;
+    static std::unique_ptr<SSTFile> readAndCreate(const std::filesystem::path& sst_path);
+    std::unique_ptr<SSTFile> shrink(uint32_t datablock_size) const;
     void clearCache() noexcept;
-    static std::vector<SSTFile> merge(
+    static std::vector<std::unique_ptr<SSTFile>>  merge(
         const std::filesystem::path& sst1_path,
         const std::vector<std::filesystem::path>&,
         const std::filesystem::path& out_dir,
@@ -156,10 +156,10 @@ public:
         bool keep_removed);
 
     template <SSTInputIterator InputIt>
-    static SSTFile writeAndCreate(const std::filesystem::path& sst_path, int max_datablock_size, uint64_t seq_num,
+    static std::unique_ptr<SSTFile> writeAndCreate(const std::filesystem::path& sst_path, int max_datablock_size, uint64_t seq_num,
         bool keep_removed, InputIt begin, InputIt end) {
         if (begin == end) {
-            return SSTFile(sst_path, 0, 0,"", {});
+            return nullptr;
         }
 
         SSTBuilder builder(sst_path, max_datablock_size, seq_num);
@@ -195,7 +195,5 @@ private:
     static int max_cached_files_;
     sst::indexblock::OffsetFieldType getDatablockSize(decltype(index_block_)::const_iterator it) const;
 
-
     friend class SSTBuilder;
-
 };

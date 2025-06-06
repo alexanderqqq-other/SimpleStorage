@@ -14,14 +14,15 @@ public:
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results) const override;
     std::vector<std::filesystem::path> filelistToMerge(uint64_t max_seq_num) const override;
     MergeResult mergeToTmp(const std::filesystem::path&, size_t datablock_size) const override;
-    void addSST(std::vector<SSTFile> sst) override;
+    void addSST(std::vector<std::unique_ptr<SSTFile>>  sst) override;
     void removeSSTs(const std::vector<std::filesystem::path>& sst_paths) override;
+    void clearCache() noexcept override;
     uint64_t maxSeqNum() const override {
-        return sst_files_.empty() ? 0 : sst_files_.back().seqNum();
+        return sst_files_.empty() ? 0 : sst_files_.back()->seqNum();
     }
 
 private:
     std::filesystem::path path_;
     size_t max_num_files_;
-    std::vector<SSTFile> sst_files_;
+    std::vector<std::unique_ptr<SSTFile>>  sst_files_;
 };

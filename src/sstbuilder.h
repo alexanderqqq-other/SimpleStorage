@@ -30,7 +30,7 @@ public:
     SSTBuilder(const std::filesystem::path& path, uint32_t max_datablock_size, uint64_t seq_num);
     uint64_t currentSize();
     void addEntry(const std::string& key, const Entry& entry, uint64_t expiration_ms);
-    SSTFile finalize();
+    std::unique_ptr<SSTFile> finalize();
 
 private:
     void writeHeader(uint64_t seq_num);

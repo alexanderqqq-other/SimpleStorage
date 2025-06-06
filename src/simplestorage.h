@@ -49,7 +49,7 @@ public:
         if (key.size() > sst::datablock::MAX_KEY_LENGTH) {
             throw std::invalid_argument("Key size exceeds maximum allowed size");
         }
-        if (Utils::onDiskEntrySize(key, value) + sst::datablock::DATABLOCK_COUNT_SIZE > config_.block_size) {
+        if (Utils::onDiskEntrySize(key, value) + sst::datablock::DATABLOCK_COUNT_SIZE > manifest_.getConfig().block_size) {
             throw std::invalid_argument("Entry size exceeds maximum allowed size");
         }
         uint64_t expiration_ms = ttl_seconds.has_value() ?
@@ -65,6 +65,7 @@ public:
 
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results = 1000) const;
 
+    void clearCache();
     void flush();
     void shrink();
     void waitAllAsync();
@@ -80,7 +81,6 @@ private:
     void handleMergeTask(const MergeTask&);
     void handleRemoveSST(const RemoveSSTTask&);
     void handleShrink(const ShrinkTask&);
-    Config config_;
     std::vector<std::unique_ptr<ILevel>> levels_;
     Manifest manifest_;
     std::filesystem::path data_dir_;

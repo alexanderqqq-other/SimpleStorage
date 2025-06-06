@@ -21,7 +21,7 @@ namespace {
             return lru_end;
         }
         auto it = sst_file_map.upper_bound(key);
-        if (it == sst_file_map.begin() || (it != sst_file_map.end() && it->second->maxKey() < key)) {
+        if (it == sst_file_map.begin() || (it != sst_file_map.end() && (*it->second)->maxKey() < key)) {
             return lru_end;
         }
 
@@ -51,7 +51,7 @@ GeneralLevel::GeneralLevel(const std::filesystem::path& path, size_t max_file_si
     if (!std::filesystem::exists(path_)) {
         std::filesystem::create_directories(path_);
     }
-    std::vector<SSTFile> sst_files;
+    std::vector<std::unique_ptr<SSTFile>>  sst_files;
     for (const auto& entry : std::filesystem::directory_iterator(path_)) {
         if (entry.is_regular_file() && entry.path().extension() == ".vsst") {
             auto sst = SSTFile::readAndCreate(entry.path());
@@ -68,7 +68,7 @@ std::optional<Entry> GeneralLevel::get(const std::string& key) const {
     if (it == lru_sst_files_.end()) {
         return std::nullopt;
     }
-    return it->get(key);
+    return (*it)->get(key);
 }
 
 bool GeneralLevel::remove(const std::string& key, uint64_t max_seq_num) {
@@ -76,7 +76,7 @@ bool GeneralLevel::remove(const std::string& key, uint64_t max_seq_num) {
     if (it == lru_sst_files_.end()) {
         return false;
     }
-    return it->remove(key);
+    return (*it)->remove(key);
 }
 
 EntryStatus GeneralLevel::status(const std::string& key) const {
@@ -84,7 +84,7 @@ EntryStatus GeneralLevel::status(const std::string& key) const {
     if (it == lru_sst_files_.end()) {
         return EntryStatus::NOT_FOUND;
     }
-    return it->status(key);
+    return (*it)->status(key);
 }
 
 std::vector<std::string> GeneralLevel::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
@@ -92,7 +92,7 @@ std::vector<std::string> GeneralLevel::keysWithPrefix(const std::string& prefix,
     result.reserve(max_results);
     for (auto it = sst_file_map_.lower_bound(prefix); it != sst_file_map_.end(); ++it) {
         const auto& sst = *(it->second);
-        auto keys = sst.keysWithPrefix(prefix, max_results - result.size());
+        auto keys = sst->keysWithPrefix(prefix, max_results - result.size());
         result.insert(result.end(),
             std::make_move_iterator(keys.begin()),
             std::make_move_iterator(keys.end()));
@@ -114,7 +114,7 @@ std::vector<std::filesystem::path> GeneralLevel::filelistToMerge(uint64_t max_se
         if (it->first > max_seq_num) {
             break; // Stop if we reach a file with a higher sequence number
         }
-        ret.push_back(it->second->path());
+        ret.push_back((*it->second)->path());
     }
     return ret;
 }
@@ -123,19 +123,19 @@ std::vector<std::filesystem::path> GeneralLevel::filelistToMerge(uint64_t max_se
 IFileLevel::MergeResult GeneralLevel::mergeToTmp(const std::filesystem::path& sst_path, size_t datablock_size) const {
     MergeResult result;
     auto new_sst_file = SSTFile::readAndCreate(sst_path);
-    auto it_upper = sst_file_map_.upper_bound(new_sst_file.minKey());
+    auto it_upper = sst_file_map_.upper_bound(new_sst_file->minKey());
 
     // Check the case if first file is overlaped
     if (it_upper != sst_file_map_.begin() && !sst_file_map_.empty()) {
         auto it_prev = std::prev(it_upper);
         // If file's maxKey >= min_key, then it overlaps
-        if (it_prev->second->maxKey() >= new_sst_file.minKey()) {
-            result.files_to_remove.push_back(it_prev->second->path());
+        if ((*it_prev->second)->maxKey() >= new_sst_file->minKey()) {
+            result.files_to_remove.push_back((*it_prev->second)->path());
         }
     }
 
-    for (auto it = it_upper; it != sst_file_map_.end() && it->first <= new_sst_file.maxKey(); ++it) {
-        result.files_to_remove.push_back(it->second->path());
+    for (auto it = it_upper; it != sst_file_map_.end() && it->first <= new_sst_file->maxKey(); ++it) {
+        result.files_to_remove.push_back((*it->second)->path());
     }
 
     //merge with empty file is OK will just copy new file to .tmp file
@@ -151,19 +151,19 @@ IFileLevel::MergeResult GeneralLevel::mergeToTmp(const std::filesystem::path& ss
     return result;
 }
 
-void GeneralLevel::addSST(std::vector<SSTFile> ssts) {
+void GeneralLevel::addSST(std::vector<std::unique_ptr<SSTFile>>  ssts) {
     for (auto& sst : ssts) {
         std::filesystem::path fpath;
-        auto num_str =  std::to_string(sst.seqNum()) + "_" + std::to_string(max_file_index_);
+        auto num_str =  std::to_string(sst->seqNum()) + "_" + std::to_string(max_file_index_);
         auto fname = file_prefix + num_str + file_extension;
         fpath = path_ / fname;
 
-        sst.rename(fpath);
+        sst->rename(fpath);
         lru_sst_files_.push_back(std::move(sst));
-        auto back = std::prev(lru_sst_files_.end());
-        sst_file_map_[back->minKey()] = back;
-        seq_num_map_[back->seqNum()] = back;
-        file_path_map_[back->path().string()] = back;
+        auto it = std::prev(lru_sst_files_.end());
+        sst_file_map_[(*it)->minKey()] = it;
+        seq_num_map_[(*it)->seqNum()] = it;
+        file_path_map_[(*it)->path().string()] = it;
         ++max_file_index_;
     }
 }
@@ -172,19 +172,25 @@ void GeneralLevel::removeSSTs(const std::vector<std::filesystem::path>& sst_path
     for (const auto& sst_path : sst_paths) {
         auto it = file_path_map_.find(sst_path.string());
         if (it != file_path_map_.end()) {
-            sst_file_map_.erase(it->second->minKey());
-            seq_num_map_.erase(it->second->seqNum());
+            sst_file_map_.erase((*it->second)->minKey());
+            seq_num_map_.erase((*it->second)->seqNum());
             lru_sst_files_.erase(it->second);
             file_path_map_.erase(it);
         }
     }
 }
 
+void GeneralLevel::clearCache() noexcept {
+    for (auto& sst : lru_sst_files_) {
+        sst->clearCache();
+    }
+}
+
 IFileLevel::MergeResult GeneralLevel::shrink(uint32_t datablock_size) {
     MergeResult result;
     for (const auto& file : lru_sst_files_) {
-        result.new_files.push_back(file.shrink(datablock_size));
-        result.files_to_remove.push_back(file.path());
+        result.new_files.push_back(file->shrink(datablock_size));
+        result.files_to_remove.push_back(file->path());
     }
     return result;
 }

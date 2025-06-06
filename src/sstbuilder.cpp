@@ -62,7 +62,7 @@ void SSTBuilder::addEntry(const std::string& key, const Entry& entry, uint64_t e
     }
 }
 
-SSTFile SSTBuilder::finalize() {
+std::unique_ptr<SSTFile> SSTBuilder::finalize() {
     if (!data_block_builder_.empty()) {
         auto datablock_data = data_block_builder_.build();
         ofs_.write(reinterpret_cast<const char*>(datablock_data.data()),
@@ -73,5 +73,5 @@ SSTFile SSTBuilder::finalize() {
     ofs_.write(reinterpret_cast<const char*>(indexblock_data.data()),
         indexblock_data.size());
     ofs_.close();
-    return SSTFile(path_, index_block_offset, seq_num_, last_key_, inmemory_index_block_);
+    return std::unique_ptr<SSTFile>(new SSTFile(path_, index_block_offset, seq_num_, last_key_, inmemory_index_block_));
 }

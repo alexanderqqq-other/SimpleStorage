@@ -24,7 +24,7 @@ protected:
         fs::remove_all(dir, ec);
     }
 
-    template <typename Vec> SSTFile createSST(uint64_t seq, const Vec& items) {
+    template <typename Vec> std::unique_ptr<SSTFile> createSST(uint64_t seq, const Vec& items) {
         fs::path tmp = dir / ("tmp_" + std::to_string(seq) + ".vsst");
         std::vector<std::pair<std::string, TestEntry>> sorted(items.begin(),
             items.end());
@@ -43,7 +43,7 @@ TEST_F(LevelZeroTest, AddAndGetLatest) {
     LevelZero lz(dir, 10);
     auto sst1 = createSST(1, v1);
     auto sst2 = createSST(2, v2);
-    std::vector<SSTFile> vec;
+    std::vector<std::unique_ptr<SSTFile>>  vec;
     vec.push_back(std::move(sst1));
     vec.push_back(std::move(sst2));
     lz.addSST(std::move(vec));
@@ -72,7 +72,7 @@ TEST_F(LevelZeroTest, KeysWithPrefixAndRemoveSST) {
     auto sst1 = createSST(1, v1);
     auto sst2 = createSST(2, v2);
     auto sst3 = createSST(3, v3);
-    std::vector<SSTFile> vec;
+    std::vector<std::unique_ptr<SSTFile>>  vec;
     vec.push_back(std::move(sst1));
     vec.push_back(std::move(sst2));
     vec.push_back(std::move(sst3));
@@ -99,7 +99,7 @@ TEST_F(LevelZeroTest, FilelistToMergeAndRemove) {
     auto s1 = createSST(1, v);
     auto s2 = createSST(2, v);
     auto s3 = createSST(3, v);
-    std::vector<SSTFile> vec2;
+    std::vector<std::unique_ptr<SSTFile>>  vec2;
     vec2.push_back(std::move(s1));
     vec2.push_back(std::move(s2));
     vec2.push_back(std::move(s3));
@@ -124,7 +124,7 @@ TEST_F(LevelZeroTest, RemoveDoesNotAffectHigherSeq) {
         {"a", {Entry{ValueType::UINT32, uint32_t(2)}, 0}} };
     auto s1 = createSST(1, v1);
     auto s2 = createSST(2, v2);
-    std::vector<SSTFile> vec3;
+    std::vector<std::unique_ptr<SSTFile>>  vec3;
     vec3.push_back(std::move(s1));
     vec3.push_back(std::move(s2));
     lz.addSST(std::move(vec3));

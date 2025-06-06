@@ -7,6 +7,7 @@
 #include <atomic>
 #include <iostream>
 #include <random>
+#include <optional>
 
 using namespace std::chrono;
 
@@ -46,16 +47,17 @@ namespace {
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
     size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 10); // default 1GB
-    size_t total_bytes_target = total_mb * 1024ull * 1024ull;
+    uint64_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
     size_t num_threads = envToSizeT("PERF_THREADS", std::thread::hardware_concurrency());
     if (num_threads == 0) num_threads = 4;
+    size_t block_size = envToSizeT("PERF_BLOCK_SIZE_KB", 32 * 1024);
 
     Config config;
     config.memtable_size_bytes = 64ull * 1024 * 1024; // default 64MB
     config.l0_max_files = 8;
-    config.block_size = 128 * 1024;
+    config.block_size = block_size;
     config.shrink_timer_minutes = 0;
 
     std::filesystem::path temp_dir = std::filesystem::temp_directory_path() / "perf_db";
@@ -63,36 +65,54 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     auto db = std::make_shared<SimpleStorage>(temp_dir, config);
 
-    std::atomic<size_t> bytes_written{ 0 };
+    std::atomic<uint64_t> bytes_written{ 0 };
     std::atomic<size_t> entries_written{ 0 };
     std::atomic<size_t> id_counter{ 0 };
 
     auto write_start = steady_clock::now();
     std::vector<std::thread> workers;
     std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
+    std::vector<std::exception_ptr> exceptions(num_threads);
     for (size_t t = 0; t < num_threads; ++t) {
         workers.emplace_back([&, t]() {
-            while (true) {
-                size_t id = id_counter.fetch_add(1);
-                std::string key = pseudo_random_string(id) + long_value + std::to_string(id);
-                auto entry = pseudo_random_value(id);
-                size_t size = Utils::onDiskEntrySize(key, entry.value);
-                size_t current = bytes_written.fetch_add(size);
-                if (current >= total_bytes_target) {
-                    break;
+            try {
+                while (true) {
+                    size_t id = id_counter.fetch_add(1);
+                    std::string key = pseudo_random_string(id, 4) + long_value + std::to_string(id);
+                    auto entry = pseudo_random_value(id);
+                    size_t size = Utils::onDiskEntrySize(key, entry.value);
+                    uint64_t current = bytes_written.fetch_add(size);
+                    if (current >= total_bytes_target) {
+                        break;
+                    }
+
+                    std::visit([&db, &key, id](auto&& arg) mutable {
+                        using T = std::decay_t<decltype(arg)>;
+                        db->put(key, arg, id % 7 == 0 ? std::optional<uint32_t>(1) : std::nullopt);
+                        }, entry.value);
+
+
+                    ++entries_written;
                 }
-
-                std::visit([&db, &key, id](auto&& arg) mutable {
-                    using T = std::decay_t<decltype(arg)>;
-                    db->put(key, arg, id % 10 == 0 ? 1 : 0);
-                    }, entry.value);
-
-
-                ++entries_written;
+            }
+            catch (...) {
+                exceptions[t] = std::current_exception();
             }
             });
     }
-    for (auto& th : workers) th.join();
+    for (auto& th : workers) {
+        th.join();
+    }
+    for (const auto& ex : exceptions) {
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (const std::exception& e) {
+                FAIL() << "Worker thread exception: " << e.what();
+            }
+        }
+    }
     db->flush();
     db->waitAllAsync();
 
@@ -108,15 +128,32 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     workers.clear();
     for (size_t t = 0; t < num_threads; ++t) {
         workers.emplace_back([&, t]() {
+            try{
             while (true) {
                 size_t id = read_counter.fetch_add(1);
                 if (id >= total_entries) break;
                 std::string key = "key_" + std::to_string(id);
                 volatile auto val = db->get(key);
             }
+            }
+            catch (...) {
+                exceptions[t] = std::current_exception();
+            }
             });
     }
-    for (auto& th : workers) th.join();
+    for (auto& th : workers) {
+        th.join();
+    }
+    for (const auto& ex : exceptions) {
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (const std::exception& e) {
+                FAIL() << "Worker thread exception: " << e.what();
+            }
+        }
+    }
     auto read_end = steady_clock::now();
 
     double read_seconds = duration<double>(read_end - read_start).count();
@@ -138,15 +175,32 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     workers.clear();
     for (size_t t = 0; t < num_threads; ++t) {
         workers.emplace_back([&, t]() {
-            while (true) {
-                size_t id = remove_counter.fetch_add(1);
-                if (id >= total_entries) break;
-                std::string key = "key_" + std::to_string(id);
-                db->remove(key);
+            try {
+                while (true) {
+                    size_t id = remove_counter.fetch_add(1);
+                    if (id >= total_entries) break;
+                    std::string key = "key_" + std::to_string(id);
+                    db->remove(key);
+                }
             }
+            catch (...) {
+            exceptions[t] = std::current_exception();
+        }
             });
     }
-    for (auto& th : workers) th.join();
+    for (auto& th : workers) {
+        th.join();
+    }
+    for (const auto& ex : exceptions) {
+        if (ex) {
+            try {
+                std::rethrow_exception(ex);
+            }
+            catch (const std::exception& e) {
+                FAIL() << "Worker thread exception: " << e.what();
+            }
+        }
+    }
     db->flush();
     db->waitAllAsync();
     auto remove_end = steady_clock::now();

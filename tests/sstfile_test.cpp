@@ -45,60 +45,60 @@ TEST_F(SSTFileTest, WriteAndReadBack_MixedTypes) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
 
-        auto val = file.get("a");
+        auto val = file->get("a");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::STRING);
         EXPECT_EQ(std::get<std::string>(val->value), "abc");
-        val = file.get("b");
+        val = file->get("b");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::UINT64);
         EXPECT_EQ(std::get<uint64_t>(val->value), 42u);
-        val = file.get("c");
+        val = file->get("c");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::DOUBLE);
         EXPECT_DOUBLE_EQ(std::get<double>(val->value), 3.14);
-        val = file.get("d");
+        val = file->get("d");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::BLOB);
         EXPECT_EQ(std::get<std::vector<uint8_t>>(val->value), std::vector<uint8_t>({ 1,2,3,4 }));
-        val = file.get("e");
+        val = file->get("e");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::U8STRING);
         EXPECT_EQ(std::get<std::u8string>(val->value), std::u8string(u8"Тест"));
-        auto missing = file.get("nokey");
+        auto missing = file->get("nokey");
         EXPECT_FALSE(missing.has_value());
-        EXPECT_EQ(file.minKey(), "a");
-        EXPECT_EQ(file.maxKey(), "e");
+        EXPECT_EQ(file->minKey(), "a");
+        EXPECT_EQ(file->maxKey(), "e");
     }
     ASSERT_TRUE(fs::exists(TMP_SST_PATH));
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
-        auto val = file.get("a");
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto val = file->get("a");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::STRING);
         EXPECT_EQ(std::get<std::string>(val->value), "abc");
-        val = file.get("b");
+        val = file->get("b");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::UINT64);
         EXPECT_EQ(std::get<uint64_t>(val->value), 42u);
-        val = file.get("c");
+        val = file->get("c");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::DOUBLE);
         EXPECT_DOUBLE_EQ(std::get<double>(val->value), 3.14);
-        val = file.get("d");
+        val = file->get("d");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::BLOB);
         EXPECT_EQ(std::get<std::vector<uint8_t>>(val->value), std::vector<uint8_t>({ 1,2,3,4 }));
-        val = file.get("e");
+        val = file->get("e");
         ASSERT_TRUE(val.has_value());
         EXPECT_EQ(val->type, ValueType::U8STRING);
         EXPECT_EQ(std::get<std::u8string>(val->value), std::u8string(u8"Тест"));
-        auto missing = file.get("nokey");
+        auto missing = file->get("nokey");
         EXPECT_FALSE(missing.has_value());
-        EXPECT_EQ(file.minKey(), "a");
-        EXPECT_EQ(file.maxKey(), "e");
+        EXPECT_EQ(file->minKey(), "a");
+        EXPECT_EQ(file->maxKey(), "e");
     }
     SUCCEED();
 }
@@ -109,15 +109,15 @@ TEST_F(SSTFileTest, ExpiredEntry_ReturnsRemoved) {
         {"foo", TestEntry{Entry{ValueType::UINT32, uint32_t(1)}, 1}}
     };
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
-        auto v = file.get("foo");
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
+        auto v = file->get("foo");
         ASSERT_TRUE(v.has_value());
         EXPECT_EQ(v->type, ValueType::REMOVED);
     }
     ASSERT_TRUE(fs::exists(TMP_SST_PATH));
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
-        auto v = file.get("foo");
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto v = file->get("foo");
         ASSERT_TRUE(v.has_value());
         EXPECT_EQ(v->type, ValueType::REMOVED);
     }
@@ -133,8 +133,8 @@ TEST_F(SSTFileTest, KeysWithPrefix) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
-        auto keys = file.keysWithPrefix("a", 10);
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
+        auto keys = file->keysWithPrefix("a", 10);
 
         EXPECT_EQ(keys.size(), 3);
         EXPECT_TRUE(std::find(keys.begin(), keys.end(), "a1") != keys.end());
@@ -143,8 +143,8 @@ TEST_F(SSTFileTest, KeysWithPrefix) {
     }
     ASSERT_TRUE(fs::exists(TMP_SST_PATH));
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
-        auto keys = file.keysWithPrefix("a", 10);
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto keys = file->keysWithPrefix("a", 10);
 
         EXPECT_EQ(keys.size(), 3);
         EXPECT_TRUE(std::find(keys.begin(), keys.end(), "a1") != keys.end());
@@ -158,9 +158,9 @@ TEST_F(SSTFileTest, KeysWithPrefix) {
 TEST_F(SSTFileTest, EmptyFile_NoEntries) {
     std::vector<std::pair<std::string, TestEntry>> empty;
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, empty.begin(), empty.end());
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, empty.begin(), empty.end());
 
-        auto val = file.get("anykey");
+        auto val = file->get("anykey");
         EXPECT_FALSE(val.has_value());
     }
     EXPECT_FALSE(fs::exists(TMP_SST_PATH));
@@ -172,8 +172,8 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
 
     std::vector<std::pair<std::string, TestEntry>> items = generateBigData();
 
-    auto do_test = [&](const SSTFile& file) {
-        auto prefix_keys = file.keysWithPrefix("pref_", PREFIX_SERIES + 10);
+    auto do_test = [&](const std::unique_ptr<SSTFile>& file) {
+        auto prefix_keys = file->keysWithPrefix("pref_", PREFIX_SERIES + 10);
         EXPECT_EQ(prefix_keys.size(), PREFIX_SERIES);
 
         for (int i = 0; i < PREFIX_SERIES; ++i) {
@@ -182,42 +182,42 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
         }
 
         {
-            auto v = file.get("test_control_uint32");
+            auto v = file->get("test_control_uint32");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::UINT32);
             EXPECT_EQ(std::get<uint32_t>(v->value), 424242u);
         }
         {
-            auto v = file.get("test_control_str");
+            auto v = file->get("test_control_str");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::STRING);
             EXPECT_EQ(std::get<std::string>(v->value), "control_test");
         }
         {
-            auto v = file.get("test_control_blob");
+            auto v = file->get("test_control_blob");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::BLOB);
             EXPECT_EQ(std::get<std::vector<uint8_t>>(v->value), ref_blob);
         }
         {
-            auto v = file.get("test_control_double");
+            auto v = file->get("test_control_double");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::DOUBLE);
             EXPECT_DOUBLE_EQ(std::get<double>(v->value), 123456.789);
         }
         {
-            auto v = file.get("test_control_u8str");
+            auto v = file->get("test_control_u8str");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::U8STRING);
             EXPECT_EQ(std::get<std::u8string>(v->value), std::u8string(u8"Юникод"));
         }
-        auto batch2_prefix = file.keysWithPrefix("batch2_", BIG_BATCH2 + 5);
+        auto batch2_prefix = file->keysWithPrefix("batch2_", BIG_BATCH2 + 5);
         EXPECT_EQ(batch2_prefix.size(), BIG_BATCH2);
         for (int i = 0; i < BIG_BATCH2; ++i) {
             std::string key = "batch2_" + std::to_string(i) + "_ZZZZZZZZZZZ";
             EXPECT_TRUE(std::find(batch2_prefix.begin(), batch2_prefix.end(), key) != batch2_prefix.end());
         }
-        batch2_prefix = file.keysWithPrefix("batch2_", 3);
+        batch2_prefix = file->keysWithPrefix("batch2_", 3);
         EXPECT_EQ(batch2_prefix.size(), 3);
         std::string key = "batch2_" + std::to_string(0) + "_ZZZZZZZZZZZ";
         EXPECT_TRUE(std::find(batch2_prefix.begin(), batch2_prefix.end(), key) != batch2_prefix.end());
@@ -229,33 +229,33 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
         EXPECT_TRUE(std::find(batch2_prefix.begin(), batch2_prefix.end(), key) != batch2_prefix.end());
 
         {
-            auto v = file.get("batch2_0_ZZZZZZZZZZZ");
+            auto v = file->get("batch2_0_ZZZZZZZZZZZ");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::UINT64);
             EXPECT_EQ(std::get<uint64_t>(v->value), 0u);
         }
         {
-            auto v = file.get("batch2_123_ZZZZZZZZZZZ");
+            auto v = file->get("batch2_123_ZZZZZZZZZZZ");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::UINT64);
             EXPECT_EQ(std::get<std::uint64_t>(v->value), 40999959);
         }
         {
-            auto v = file.get("batch2_154_ZZZZZZZZZZZ");
+            auto v = file->get("batch2_154_ZZZZZZZZZZZ");
             ASSERT_TRUE(v.has_value());
             EXPECT_EQ(v->type, ValueType::STRING);
             EXPECT_EQ(std::get<std::string>(v->value), "b2_154");
         }
         };
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BIG_BLOCK_SIZE, 0, true, items.begin(), items.end());
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BIG_BLOCK_SIZE, 0, true, items.begin(), items.end());
         do_test(file);
 
-        auto v = file.get("test_remove_blob");
+        auto v = file->get("test_remove_blob");
         ASSERT_TRUE(v.has_value());
         EXPECT_EQ(v->type, ValueType::BLOB);
         EXPECT_EQ(std::get<std::vector<uint8_t>>(v->value), ref_blob);
-        auto test_prefix = file.keysWithPrefix("test_", 50);
+        auto test_prefix = file->keysWithPrefix("test_", 50);
         EXPECT_EQ(test_prefix.size(), 6);
         EXPECT_EQ(test_prefix[0], "test_control_blob");
         EXPECT_EQ(test_prefix[1], "test_control_double");
@@ -264,25 +264,25 @@ TEST_F(SSTFileTest, LargeDataSet_MultiBlock) {
         EXPECT_EQ(test_prefix[4], "test_control_uint32");
         EXPECT_EQ(test_prefix[5], "test_remove_blob");
 
-        bool removed = file.remove("test_remove_blob");
+        bool removed = file->remove("test_remove_blob");
         EXPECT_TRUE(removed);
-        auto removed_val = file.get("test_remove_blob");
+        auto removed_val = file->get("test_remove_blob");
         ASSERT_TRUE(removed_val.has_value());
         EXPECT_EQ(removed_val->type, ValueType::REMOVED);
-        EXPECT_EQ(file.status("test_remove_blob"), EntryStatus::REMOVED);
-        test_prefix = file.keysWithPrefix("test_", 50);
+        EXPECT_EQ(file->status("test_remove_blob"), EntryStatus::REMOVED);
+        test_prefix = file->keysWithPrefix("test_", 50);
         EXPECT_EQ(test_prefix.size(), 5);
         auto it = std::find(test_prefix.begin(), test_prefix.end(), "test_remove_blob");
         EXPECT_EQ(it, test_prefix.end()) << "test_remove_blob should not be in the prefix list after removal";
     }
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
         do_test(file);
-        auto removed_val = file.get("test_remove_blob");
+        auto removed_val = file->get("test_remove_blob");
         ASSERT_TRUE(removed_val.has_value());
         EXPECT_EQ(removed_val->type, ValueType::REMOVED);
-        EXPECT_EQ(file.status("test_remove_blob"), EntryStatus::REMOVED);
-        auto test_prefix = file.keysWithPrefix("test_", 50);
+        EXPECT_EQ(file->status("test_remove_blob"), EntryStatus::REMOVED);
+        auto test_prefix = file->keysWithPrefix("test_", 50);
         EXPECT_EQ(test_prefix.size(), 5);
         auto it = std::find(test_prefix.begin(), test_prefix.end(), "test_remove_blob");
         EXPECT_EQ(it, test_prefix.end()) << "test_remove_blob should not be in the prefix list after removal";
@@ -299,26 +299,26 @@ TEST_F(SSTFileTest, Shrink_RemovesDeletedEntries) {
     std::sort(items.begin(), items.end(), [](const auto& lhs, const auto& rhs) { return lhs.first < rhs.first; });
 
     auto orig_path = temp_dir / "shrink_src.vsst";
-    SSTFile file = SSTFile::writeAndCreate(orig_path, BLOCK_SIZE, 0, true, items.begin(), items.end());
+    auto file = SSTFile::writeAndCreate(orig_path, BLOCK_SIZE, 0, true, items.begin(), items.end());
 
-    ASSERT_TRUE(file.remove("b"));
-    auto removed = file.get("b");
+    ASSERT_TRUE(file->remove("b"));
+    auto removed = file->get("b");
     ASSERT_TRUE(removed.has_value());
     EXPECT_EQ(removed->type, ValueType::REMOVED);
 
-    auto orig_size = fs::file_size(file.path());
+    auto orig_size = fs::file_size(file->path());
 
-    SSTFile shrunk = file.shrink(BLOCK_SIZE);
+    auto shrunk = file->shrink(BLOCK_SIZE);
 
-    EXPECT_TRUE(fs::exists(shrunk.path()));
-    EXPECT_LT(fs::file_size(shrunk.path()), orig_size);
+    EXPECT_TRUE(fs::exists(shrunk->path()));
+    EXPECT_LT(fs::file_size(shrunk->path()), orig_size);
 
-    EXPECT_FALSE(shrunk.get("b").has_value());
+    EXPECT_FALSE(shrunk->get("b").has_value());
 
-    auto v = shrunk.get("a");
+    auto v = shrunk->get("a");
     ASSERT_TRUE(v.has_value());
     EXPECT_EQ(std::get<std::string>(v->value), "one");
-    v = shrunk.get("c");
+    v = shrunk->get("c");
     ASSERT_TRUE(v.has_value());
     EXPECT_EQ(std::get<std::string>(v->value), "three");
 }
@@ -333,51 +333,51 @@ TEST_F(SSTFileTest, RemoveEntry_WorksAsExpected) {
     };
     std::sort(items.begin(), items.end(), [](auto& a, auto& b) { return a.first < b.first; });
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
 
-        auto v1 = file.get("keep1");
+        auto v1 = file->get("keep1");
         ASSERT_TRUE(v1.has_value());
         EXPECT_EQ(v1->type, ValueType::STRING);
-        auto v2 = file.get("remove_me");
+        auto v2 = file->get("remove_me");
         ASSERT_TRUE(v2.has_value());
         EXPECT_EQ(v2->type, ValueType::UINT64);
-        auto v3 = file.get("keep2");
+        auto v3 = file->get("keep2");
         ASSERT_TRUE(v3.has_value());
         EXPECT_EQ(v3->type, ValueType::DOUBLE);
 
-        bool removed = file.remove("remove_me");
+        bool removed = file->remove("remove_me");
         EXPECT_TRUE(removed);
-        removed = file.remove("not_found");
+        removed = file->remove("not_found");
         EXPECT_FALSE(removed);
 
-        auto removed_val = file.get("remove_me");
+        auto removed_val = file->get("remove_me");
         ASSERT_TRUE(removed_val.has_value());
         EXPECT_EQ(removed_val->type, ValueType::REMOVED);
-        EXPECT_EQ(file.status("remove_me"), EntryStatus::REMOVED);
-        auto still_v1 = file.get("keep1");
+        EXPECT_EQ(file->status("remove_me"), EntryStatus::REMOVED);
+        auto still_v1 = file->get("keep1");
         ASSERT_TRUE(still_v1.has_value());
         EXPECT_EQ(still_v1->type, ValueType::STRING);
-        EXPECT_EQ(file.status("keep1"), EntryStatus::EXISTS);
-        auto still_v3 = file.get("keep2");
+        EXPECT_EQ(file->status("keep1"), EntryStatus::EXISTS);
+        auto still_v3 = file->get("keep2");
         ASSERT_TRUE(still_v3.has_value());
         EXPECT_EQ(still_v3->type, ValueType::DOUBLE);
-        EXPECT_EQ(file.status("not_found"), EntryStatus::NOT_FOUND);
+        EXPECT_EQ(file->status("not_found"), EntryStatus::NOT_FOUND);
 
     }
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
-        auto removed_val = file.get("remove_me");
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto removed_val = file->get("remove_me");
         ASSERT_TRUE(removed_val.has_value());
         EXPECT_EQ(removed_val->type, ValueType::REMOVED);
-        EXPECT_EQ(file.status("remove_me"), EntryStatus::REMOVED);
-        auto still_v1 = file.get("keep1");
+        EXPECT_EQ(file->status("remove_me"), EntryStatus::REMOVED);
+        auto still_v1 = file->get("keep1");
         ASSERT_TRUE(still_v1.has_value());
         EXPECT_EQ(still_v1->type, ValueType::STRING);
-        EXPECT_EQ(file.status("keep1"), EntryStatus::EXISTS);
-        auto still_v3 = file.get("keep2");
+        EXPECT_EQ(file->status("keep1"), EntryStatus::EXISTS);
+        auto still_v3 = file->get("keep2");
         ASSERT_TRUE(still_v3.has_value());
         EXPECT_EQ(still_v3->type, ValueType::DOUBLE);
-        EXPECT_EQ(file.status("not_found"), EntryStatus::NOT_FOUND);
+        EXPECT_EQ(file->status("not_found"), EntryStatus::NOT_FOUND);
     }
 }
 
@@ -407,10 +407,10 @@ TEST_F(SSTFileTest, CorruptionTest) {
 
         // Try to open as SSTFile and get keys, must NOT crash
         try {
-            SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
+            auto file = SSTFile::readAndCreate(TMP_SST_PATH);
             // Try to read keys; it's ok if garbage or exceptions
-            auto v1 = file.get("test_1");
-            auto v2 = file.get("test_2");
+            auto v1 = file->get("test_1");
+            auto v2 = file->get("test_2");
             EXPECT_TRUE(v2.has_value() || !v2.has_value());
             // No expectations on value: just make sure it does not crash
         }
@@ -451,7 +451,7 @@ TEST_F(SSTFileTest, Iterator_MultiBlock) {
         });
 
     {
-        SSTFile file = SSTFile::writeAndCreate(TMP_SST_PATH,
+        auto file = SSTFile::writeAndCreate(TMP_SST_PATH,
             BLOCK_SIZE_SMALL,
             /*seq_num=*/0,
             true,
@@ -459,7 +459,7 @@ TEST_F(SSTFileTest, Iterator_MultiBlock) {
             items.end());
 
         std::vector<std::pair<std::string, DataBlock::DataBlockEntry>> collected;
-        for (auto it = file.begin(); it != file.end(); ++it) {
+        for (auto it = file->begin(); it != file->end(); ++it) {
             collected.push_back(*it);
         }
 
@@ -477,10 +477,10 @@ TEST_F(SSTFileTest, Iterator_MultiBlock) {
     }
 
     {
-        SSTFile file = SSTFile::readAndCreate(TMP_SST_PATH);
+        auto file = SSTFile::readAndCreate(TMP_SST_PATH);
 
         std::vector<std::pair<std::string, DataBlock::DataBlockEntry>> collected2;
-        for (auto it = file.begin(); it != file.end(); ++it) {
+        for (auto it = file->begin(); it != file->end(); ++it) {
             collected2.push_back(*it);
         }
 
@@ -524,22 +524,22 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
         };
 
     // Save as SST files (with tiny block size to force many DataBlocks)
-    auto sst1_path = temp_dir / "sst1.vsst";
-    auto sst2_path = temp_dir / "sst2.vsst";
+    auto sst1_path = temp_dir / "sst1->vsst";
+    auto sst2_path = temp_dir / "sst2->vsst";
     uint32_t block_size = 64; // tiny block size
     std::sort(data1.begin(), data1.end(), [](auto& a, auto& b) { return a.first < b.first; });
     std::sort(data2.begin(), data2.end(), [](auto& a, auto& b) { return a.first < b.first; });
     auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, true, data1.begin(), data1.end());
     std::vector<std::filesystem::path> dst_files;
-    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end()).path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end())->path());
 
-    // Merge in one file.
+    // Merge in one file->
 
-    auto test_f = [&](const std::vector<SSTFile>& merged) {
+    auto test_f = [&](const std::vector<std::unique_ptr<SSTFile>> & merged) {
         // Read all output keys/values into a map, assert uniqueness
         std::map<std::string, Entry> merged_entries;
         for (const auto& mf : merged) {
-            for (auto it = mf.begin(); it != mf.end(); ++it) {
+            for (auto it = mf->begin(); it != mf->end(); ++it) {
                 auto [key, entry] = *it;
                 if (entry.entry.type != ValueType::REMOVED) {
                     ASSERT_TRUE(merged_entries.emplace(key, entry.entry).second)
@@ -596,28 +596,28 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
         auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size, false);
         ASSERT_TRUE(merged.size() == 1);
         test_f(merged);
-        EXPECT_EQ(merged[0].minKey(), "a");
-        EXPECT_EQ(merged[0].maxKey(), "eee_123");
+        EXPECT_EQ(merged[0]->minKey(), "a");
+        EXPECT_EQ(merged[0]->maxKey(), "eee_123");
 
-        std::vector<SSTFile> readed_files;
-        readed_files.push_back(SSTFile::readAndCreate(merged.front().path()));
+        std::vector<std::unique_ptr<SSTFile>>  readed_files;
+        readed_files.push_back(SSTFile::readAndCreate(merged.front()->path()));
         test_f(readed_files);
-        EXPECT_EQ(readed_files[0].minKey(), "a");
-        EXPECT_EQ(readed_files[0].maxKey(), "eee_123");
+        EXPECT_EQ(readed_files[0]->minKey(), "a");
+        EXPECT_EQ(readed_files[0]->maxKey(), "eee_123");
     }
     {   //merge in two files
         auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size, false);
         ASSERT_TRUE(merged.size() == 2);
         test_f(merged);
-        EXPECT_EQ(merged[0].minKey(), "a");
-        EXPECT_EQ(merged[1].maxKey(), "eee_123");
-        std::vector<SSTFile> readed_files;
+        EXPECT_EQ(merged[0]->minKey(), "a");
+        EXPECT_EQ(merged[1]->maxKey(), "eee_123");
+        std::vector<std::unique_ptr<SSTFile>>  readed_files;
         for (const auto& mf : merged) {
-            readed_files.push_back(SSTFile::readAndCreate(mf.path()));
+            readed_files.push_back(SSTFile::readAndCreate(mf->path()));
         }
         test_f(readed_files);
-        EXPECT_EQ(readed_files[0].minKey(), "a");
-        EXPECT_EQ(readed_files[1].maxKey(), "eee_123");
+        EXPECT_EQ(readed_files[0]->minKey(), "a");
+        EXPECT_EQ(readed_files[1]->maxKey(), "eee_123");
 
     }
 }
@@ -659,8 +659,8 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
     };
 
     // Save as SST files (with tiny block size to force many DataBlocks)
-    auto sst1_path = temp_dir / "sst1.vsst";
-    auto sst2_path = temp_dir / "sst2.vsst";
+    auto sst1_path = temp_dir / "sst1->vsst";
+    auto sst2_path = temp_dir / "sst2->vsst";
     auto sst3_path = temp_dir / "sst3.vsst";
     uint32_t block_size = 64; // tiny block size
     std::sort(data1.begin(), data1.end(), [](auto& a, auto& b) { return a.first < b.first; });
@@ -668,16 +668,16 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
     std::sort(data3.begin(), data3.end(), [](auto& a, auto& b) { return a.first < b.first; });
     auto sst1 = SSTFile::writeAndCreate(sst1_path, block_size, seq1, true, data1.begin(), data1.end());
     std::vector<std::filesystem::path> dst_files;
-    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end()).path());
-    dst_files.push_back(SSTFile::writeAndCreate(sst3_path, block_size, seq3, true, data3.begin(), data3.end()).path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst2_path, block_size, seq2, true, data2.begin(), data2.end())->path());
+    dst_files.push_back(SSTFile::writeAndCreate(sst3_path, block_size, seq3, true, data3.begin(), data3.end())->path());
 
-    // Merge in one file.
+    // Merge in one file->
 
-    auto test_f = [&](const std::vector<SSTFile>& merged) {
+    auto test_f = [&](const std::vector<std::unique_ptr<SSTFile>> & merged) {
         // Read all output keys/values into a map, assert uniqueness
         std::map<std::string, Entry> merged_entries;
         for (const auto& mf : merged) {
-            for (auto it = mf.begin(); it != mf.end(); ++it) {
+            for (auto it = mf->begin(); it != mf->end(); ++it) {
                 const auto& [key, entry] = *it;
                 if (entry.entry.type != ValueType::REMOVED) {
                     ASSERT_TRUE(merged_entries.emplace(key, entry.entry).second)
@@ -747,28 +747,28 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
         auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir, 1024, block_size, false);
         ASSERT_TRUE(merged.size() == 1);
         test_f(merged);
-        EXPECT_EQ(merged.front().minKey(), "a");
-        EXPECT_EQ(merged.back().maxKey(), "xdup");
+        EXPECT_EQ(merged.front()->minKey(), "a");
+        EXPECT_EQ(merged.back()->maxKey(), "xdup");
 
-        std::vector<SSTFile> readed_files;
-        readed_files.push_back(SSTFile::readAndCreate(merged.front().path()));
+        std::vector<std::unique_ptr<SSTFile>>  readed_files;
+        readed_files.push_back(SSTFile::readAndCreate(merged.front()->path()));
         test_f(readed_files);
-        EXPECT_EQ(merged.front().minKey(), "a");
-        EXPECT_EQ(merged.back().maxKey(), "xdup");
+        EXPECT_EQ(merged.front()->minKey(), "a");
+        EXPECT_EQ(merged.back()->maxKey(), "xdup");
     }
     {   //merge in three files
         auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 397, block_size, false);
         ASSERT_TRUE(merged.size() == 2);
         test_f(merged);
-        EXPECT_EQ(merged.front().minKey(), "a");
-        EXPECT_EQ(merged.back().maxKey(), "xdup");
-        std::vector<SSTFile> readed_files;
+        EXPECT_EQ(merged.front()->minKey(), "a");
+        EXPECT_EQ(merged.back()->maxKey(), "xdup");
+        std::vector<std::unique_ptr<SSTFile>>  readed_files;
         for (const auto& mf : merged) {
-            readed_files.push_back(SSTFile::readAndCreate(mf.path()));
+            readed_files.push_back(SSTFile::readAndCreate(mf->path()));
         }
         test_f(readed_files);
-        EXPECT_EQ(merged.front().minKey(), "a");
-        EXPECT_EQ(merged.back().maxKey(), "xdup");;
+        EXPECT_EQ(merged.front()->minKey(), "a");
+        EXPECT_EQ(merged.back()->maxKey(), "xdup");;
 
     }
 }

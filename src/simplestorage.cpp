@@ -58,7 +58,7 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
     for (const auto& entry : std::filesystem::recursive_directory_iterator(data_dir_)) {
         if (entry.is_regular_file() && entry.path().extension() == ".vsst") {
             auto sst = SSTFile::readAndCreate(entry.path());
-            sst_sequence_number = std::max(sst_sequence_number, sst.seqNum());
+            sst_sequence_number = std::max(sst_sequence_number, sst->seqNum());
         }
     }
     levels_.push_back(std::make_unique<MemTable>(real_config.memtable_size_bytes)); // First level is MemTable
@@ -157,6 +157,12 @@ std::vector<std::string> SimpleStorage::keysWithPrefix(const std::string& prefix
 }
 
 
+void SimpleStorage::clearCache() {
+    for (size_t i = 1; i < levels_.size(); ++i) {
+        static_cast<IFileLevel*>(levels_[i].get())->clearCache();
+    }
+}
+
 void SimpleStorage::flush() {
     std::lock_guard readwrite_lock(readwrite_mutex_);
     if (memTable()->count() != 0) {
@@ -174,7 +180,7 @@ void SimpleStorage::putImpl(const std::string& key, const Entry& entry, uint64_t
 }
 
 void SimpleStorage::flushImpl() {
-    std::vector<SSTFile> ssts;
+    std::vector<std::unique_ptr<SSTFile>>  ssts;
     ssts.push_back(SSTFile::writeAndCreate(data_dir_ / std::filesystem::path(memtable_name),
         manifest_.getConfig().block_size,
         ++sst_sequence_number, true,
@@ -189,7 +195,7 @@ void SimpleStorage::completeMerge() {
     std::lock_guard lock(readwrite_mutex_);
     MergeLog merge_log(data_dir_ / merge_log_name);
     for (const auto& [level, sst_paths] : merge_log.filesToRegister()) {
-        std::vector<SSTFile> to_merge;
+        std::vector<std::unique_ptr<SSTFile>>  to_merge;
         auto* level_ptr = static_cast<IFileLevel*>(levels_[level].get());
         for (const auto& sst_path : sst_paths) {
             to_merge.push_back(SSTFile::readAndCreate(sst_path));
@@ -286,7 +292,7 @@ void SimpleStorage::handleMergeTask(const MergeTask& t) {
         auto merge_result = next_level->mergeToTmp(sst_path, manifest_.getConfig().block_size);
         merge_log.addToRemove(sst_path);
         for (const auto& sst : merge_result.new_files) {
-            merge_log.addToRegister(dst_level, sst.path());
+            merge_log.addToRegister(dst_level, sst->path());
         }
         for (const auto& sst_path : merge_result.files_to_remove) {
             merge_log.addToRemove(sst_path);
@@ -320,7 +326,7 @@ void SimpleStorage::handleShrink(const ShrinkTask&) {
     auto merge_result = last_level->shrink(manifest_.getConfig().block_size);
     MergeLog merge_log(data_dir_ / merge_log_name);
     for (const auto& sst : merge_result.new_files) {
-        merge_log.addToRegister(levels_.size() - 1, sst.path());
+        merge_log.addToRegister(levels_.size() - 1, sst->path());
     }
     for (const auto& sst_path : merge_result.files_to_remove) {
         merge_log.addToRemove(sst_path);
