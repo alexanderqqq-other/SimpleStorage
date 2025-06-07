@@ -77,7 +77,12 @@ SimpleStorage::SimpleStorage(const std::filesystem::path& data_dir, const Config
 }
 
 SimpleStorage::~SimpleStorage() {
-    flush();
+    try {
+        flush();
+    }
+    catch (...) {
+        // ignore other errors
+    }
     worker_thread_.request_stop();
     queue_cv_.notify_all();
 }
