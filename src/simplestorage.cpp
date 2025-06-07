@@ -84,6 +84,8 @@ SimpleStorage::~SimpleStorage() {
         // ignore other errors
     }
     worker_thread_.request_stop();
+    shrink_timer_thread_.request_stop();
+    shrink_cv_.notify_all();
     queue_cv_.notify_all();
 }
 
@@ -241,9 +243,14 @@ MemTable* SimpleStorage::memTable() {
 void SimpleStorage::shrinkTimerLoop(std::stop_token stop_token) {
     while (!stop_token.stop_requested()) {
         auto minutes = manifest_.getConfig().shrink_timer_minutes;
-        std::this_thread::sleep_for(std::chrono::minutes(minutes));
-        if (stop_token.stop_requested()) break;
-        this->shrink();
+        std::unique_lock lock(shrink_mutex_);
+        bool stopped = shrink_cv_.wait_for(lock, stop_token, std::chrono::minutes(minutes),
+            [&] { return stop_token.stop_requested(); }
+        );
+        if (stopped) {
+            break;
+        }
+        shrink();
     }
 }
 

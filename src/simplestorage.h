@@ -86,8 +86,11 @@ private:
     std::filesystem::path data_dir_;
     mutable std::shared_mutex readwrite_mutex_; 
     mutable std::mutex queue_mutex_; 
+    mutable std::mutex shrink_mutex_;
     std::condition_variable queue_cv_;
     std::condition_variable queue_empty_cv_;
+    std::condition_variable_any shrink_cv_;
+
     std::queue<StorageTask> task_queue_;
     std::jthread worker_thread_;
     std::jthread shrink_timer_thread_;
