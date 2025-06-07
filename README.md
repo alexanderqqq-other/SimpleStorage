@@ -29,9 +29,9 @@ data/
 - Maximum number of files: **4** (Can be configured: **2 - 16**)
 - File size: **see memtable**
 
-### Level 1 (L1)
-
-- File size: **< 2GB**
+### Level 1+ (L1+)
+- Each non-zero level has x2 files and x4 file size.
+- File size up to: **< 2GB**
 
 ## SST File Structure
 
