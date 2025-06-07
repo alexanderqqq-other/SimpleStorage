@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include "../src/memtable.h"
 #include "../src/types.h"
-
+#include <thread>
 using namespace std;
 
 class MemTableTest : public ::testing::Test {
