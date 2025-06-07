@@ -331,7 +331,7 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
             continue;
         }
 
-        if (builder.currentSize() >= max_file_size - datablock_size*2) {
+        if (builder.currentSize() >= max_file_size - datablock_size) {
             result.push_back(builder.finalize());
             ++current_seq_index;
             if (current_seq_index >= seq_nums.size()) {
