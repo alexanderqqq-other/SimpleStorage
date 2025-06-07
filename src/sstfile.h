@@ -184,6 +184,9 @@ private:
     void writeDatablock(const DataBlock& block, sst::indexblock::OffsetFieldType offsetIndex) const;
     auto findDBlockOffset(const std::string& min_key) const;
 
+    mutable std::ifstream ifs_;
+    void openIfNeeded() const;
+
     std::filesystem::path path_;
     std::vector<std::pair<std::string, sst::indexblock::OffsetFieldType>> index_block_;
     sst::indexblock::OffsetFieldType index_block_offset_;

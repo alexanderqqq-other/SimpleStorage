@@ -30,6 +30,8 @@ public:
     SSTBuilder(const std::filesystem::path& path, uint32_t max_datablock_size, uint64_t seq_num);
     uint64_t currentSize();
     void addEntry(const std::string& key, const Entry& entry, uint64_t expiration_ms);
+    void addDatablock(const std::string& min_key, const std::vector<uint8_t>& data,
+        const std::string& max_key);
     std::unique_ptr<SSTFile> finalize();
 
 private:

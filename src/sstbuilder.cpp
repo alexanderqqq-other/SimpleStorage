@@ -74,3 +74,15 @@ std::unique_ptr<SSTFile> SSTBuilder::finalize() {
     ofs_.close();
     return std::unique_ptr<SSTFile>(new SSTFile(path_, index_block_offset, seq_num_, last_key_, inmemory_index_block_));
 }
+
+void SSTBuilder::addDatablock(const std::string& min_key, const std::vector<uint8_t>& data,
+    const std::string& max_key)
+{
+    last_key_ = max_key;
+    if (inmemory_index_block_.empty()) {
+        writeHeader(seq_num_);
+    }
+    index_block_builder_.addKey(min_key, ofs_.tellp());
+    inmemory_index_block_.push_back({ min_key, ofs_.tellp() });
+    ofs_.write(reinterpret_cast<const char*>(data.data()), data.size());
+}

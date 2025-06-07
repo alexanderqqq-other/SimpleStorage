@@ -9,6 +9,12 @@ SSTFile::SSTFile(const std::filesystem::path& path, sst::indexblock::OffsetField
     std::vector <std::pair<std::string, iblock::OffsetFieldType>> index_block) :
     path_(path), index_block_offset_(index_block_offset), index_block_(std::move(index_block)), seq_num_(seq_num), max_key_(max_key) {}
 
+void SSTFile::openIfNeeded() const {
+    if (!ifs_.is_open()) {
+        ifs_.open(path_, std::ios::binary);
+    }
+}
+
 std::vector<uint8_t> SSTFile::readDatablock(iblock::OffsetFieldType block_offset, iblock::OffsetFieldType block_size) const {
     // SSTFile is not thread-safe, but this is const operation so it can be called concurrently
     std::lock_guard lock(cache_mutex_);
@@ -19,7 +25,16 @@ std::vector<uint8_t> SSTFile::readDatablock(iblock::OffsetFieldType block_offset
         // Remove random cached block if we exceed the limit
         datablock_cache_.erase(datablock_cache_.begin());
     }
-    auto data = readDatablock(path_, block_offset, block_size);
+    openIfNeeded();
+    if (!ifs_) {
+        return {};
+    }
+    ifs_.seekg(block_offset, std::ios::beg);
+    std::vector<uint8_t> data(block_size);
+    ifs_.read(reinterpret_cast<char*>(data.data()), block_size);
+    if (ifs_.gcount() != block_size) {
+        return {};
+    }
     datablock_cache_[block_offset] = std::move(data);
     return datablock_cache_[block_offset];
 }
@@ -124,6 +139,9 @@ EntryStatus SSTFile::status(const std::string& key) const
     return data_block.status(key);
 }
 void SSTFile::rename(const std::filesystem::path& new_path) {
+    if (ifs_.is_open()) {
+        ifs_.close();
+    }
     std::filesystem::rename(path_, new_path);
     path_ = new_path;
 }
@@ -174,7 +192,7 @@ std::unique_ptr<SSTFile> SSTFile::readAndCreate(const std::filesystem::path& sst
 
     std::vector<std::pair<std::string, iblock::OffsetFieldType>> index_block;
     uint64_t pos = 0;
-    iblock::OffsetFieldType offset;
+    iblock::OffsetFieldType offset = 0;
     while (pos + sizeof(iblock::IndexKeyLengthFieldType) < indexblock_buf.size()) {
         auto key_len = Utils::deserializeLE<iblock::IndexKeyLengthFieldType>(&indexblock_buf[pos]);
         if (key_len == 0 || pos + iblock::INDEX_KEY_LEN + iblock::BLOCK_OFFSET_SIZE + key_len > indexblock_buf.size()) {
@@ -259,6 +277,31 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
     dst_files.reserve(dst_file_paths.size());
     for (const auto& dst_file_path : dst_file_paths) {
         dst_files.push_back(SSTFile::readAndCreate(dst_file_path));
+    }
+
+    bool sst1_before = !dst_files.empty() && sst1->maxKey() < dst_files.front()->minKey();
+    bool sst1_after = !dst_files.empty() && sst1->minKey() > dst_files.back()->maxKey();
+    if (dst_files.size() == 1 && (sst1_before || sst1_after)) {
+        uint64_t seq_num = std::min(sst1->seqNum(), dst_files.front()->seqNum());
+        SSTBuilder builder(out_dir / ("merged_" + std::to_string(seq_num) + ".tmp"), datablock_size, seq_num);
+        auto copyFile = [&](const std::unique_ptr<SSTFile>& file) {
+            for (auto it = file->index_block_.begin(); it != file->index_block_.end(); ++it) {
+                auto block_data = file->readDatablock(it->second, file->getDatablockSize(it));
+                DataBlock db(block_data);
+                std::string max_key = db.get(db.count() - 1).first;
+                builder.addDatablock(it->first, block_data, max_key);
+            }
+        };
+        if (sst1_before) {
+            copyFile(sst1);
+            copyFile(dst_files.front());
+        } else {
+            copyFile(dst_files.front());
+            copyFile(sst1);
+        }
+        std::vector<std::unique_ptr<SSTFile>> res;
+        res.push_back(builder.finalize());
+        return res;
     }
     std::vector<std::unique_ptr<SSTFile>>  result;
     std::vector<uint64_t> seq_nums;

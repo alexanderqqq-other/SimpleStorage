@@ -25,7 +25,7 @@ namespace {
     std::vector<LevelParams> generateLevelConfigs(size_t memtable_size_bytes, size_t l0_max_files) {
         std::vector<LevelParams> levels;
 
-        constexpr int GROWTH_SIZE_FACTOR = 5;
+        constexpr int GROWTH_SIZE_FACTOR = 4;
         constexpr int GROWH_FILE_NUMBER_FACTOR = 2;
         uint64_t file_size = memtable_size_bytes;
         auto num_files = l0_max_files;
