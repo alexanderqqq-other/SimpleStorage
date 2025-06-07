@@ -56,7 +56,7 @@ namespace {
 
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
-    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 500); // default 100MB
+    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 100); // default 100MB
     uint64_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
