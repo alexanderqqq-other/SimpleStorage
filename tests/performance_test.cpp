@@ -46,9 +46,8 @@ namespace {
         try { return std::stoull(v); }
         catch (...) { return defValue; }
     }
-
+    std::string long_value(50, 'x');        // minimum 50 bytes long value for testing
     std::string getKeyById(size_t id) {
-        std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
         return getStringFromIndex(id) + pseudo_random_string(id) + long_value + std::to_string(id);
     }
 }
@@ -57,7 +56,7 @@ namespace {
 
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
-    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 100); // default 100MB
+    size_t total_mb = envToMb("PERF_TOTAL_SIZE_MB", 500); // default 100MB
     uint64_t total_bytes_target = total_mb * 1024ull * 1024ull;
 
     // Configure number of worker threads via PERF_THREADS env variable
@@ -193,7 +192,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     auto prefix_end = steady_clock::now();
     double prefix_seconds = duration<double>(prefix_end - prefix_start).count();
     std::cout << "1000 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
-
+    std::cout << "Removing all entries\n";
     std::atomic<size_t> remove_counter{ 0 };
     auto remove_start = steady_clock::now();
     workers.clear();
@@ -232,6 +231,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     double remove_seconds = duration<double>(remove_end - remove_start).count();
     std::cout << "Removed " << total_entries << " entries in " << remove_seconds << " seconds using " << num_threads << " threads\n";
     std::cout << "Total size on disk after remove: " << get_directory_size_mb_str(temp_dir) << "\n";
+    std::cout << "shrinking database\n";
     auto shrink_start = steady_clock::now();
     db->shrink();
     db->waitAllAsync();

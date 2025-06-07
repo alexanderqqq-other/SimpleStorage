@@ -189,7 +189,10 @@ void GeneralLevel::clearCache() noexcept {
 IFileLevel::MergeResult GeneralLevel::shrink(uint32_t datablock_size) {
     MergeResult result;
     for (const auto& file : lru_sst_files_) {
-        result.new_files.push_back(file->shrink(datablock_size));
+        auto new_file = file->shrink(datablock_size);
+        if (new_file) {
+            result.new_files.push_back(std::move(new_file));
+        }
         result.files_to_remove.push_back(file->path());
     }
     return result;

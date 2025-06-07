@@ -285,10 +285,14 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
         uint64_t seq_num = std::min(sst1->seqNum(), dst_files.front()->seqNum());
         SSTBuilder builder(out_dir / ("merged_" + std::to_string(seq_num) + ".tmp"), datablock_size, seq_num);
         auto copyFile = [&](const std::unique_ptr<SSTFile>& file) {
-            for (auto it = file->index_block_.begin(); it != file->index_block_.end(); ++it) {
+            int i = 0;
+            for (auto it = file->index_block_.begin(); it != file->index_block_.end(); ++it, ++i) {
                 auto block_data = file->readDatablock(it->second, file->getDatablockSize(it));
-                DataBlock db(block_data);
-                std::string max_key = db.get(db.count() - 1).first;
+                std::string max_key;
+                if (i == file->index_block_.size() - 1) {
+                    DataBlock db(block_data);
+                    max_key = db.get(db.count() - 1).first;
+                }
                 builder.addDatablock(it->first, block_data, max_key);
             }
         };
@@ -327,7 +331,7 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
             continue;
         }
 
-        if (builder.currentSize() >= max_file_size - datablock_size) {
+        if (builder.currentSize() >= max_file_size - datablock_size*2) {
             result.push_back(builder.finalize());
             ++current_seq_index;
             if (current_seq_index >= seq_nums.size()) {

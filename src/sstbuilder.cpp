@@ -28,6 +28,7 @@ SSTBuilder::SSTBuilder(const std::filesystem::path& path, uint32_t max_datablock
             path.string());
     }
 }
+
 uint64_t SSTBuilder::currentSize() {
     return static_cast<uint64_t>(ofs_.tellp()) + data_block_builder_.size() + index_block_builder_.size();
 }
@@ -69,9 +70,14 @@ std::unique_ptr<SSTFile> SSTBuilder::finalize() {
     }
     auto indexblock_data = index_block_builder_.build();
     size_t index_block_offset = ofs_.tellp();
+    if (index_block_offset == 0) {
+        // If no data was written, we can't create a valid SST file
+        ofs_.close();
+        std::filesystem::remove(path_);
+        return nullptr;
+    }
     ofs_.write(reinterpret_cast<const char*>(indexblock_data.data()),
         indexblock_data.size());
-    ofs_.close();
     return std::unique_ptr<SSTFile>(new SSTFile(path_, index_block_offset, seq_num_, last_key_, inmemory_index_block_));
 }
 
