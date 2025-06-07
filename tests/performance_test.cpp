@@ -185,14 +185,14 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     std::cout << "Reading values by prefix\n";
     // Prefix search timings for a few ranges
     auto prefix_start = steady_clock::now();
-    for (int i = 0; i < 10000; i+=100) {
+    for (int i = 0; i < 10000; i+=10) {
         std::string prefix = getStringFromIndex(i);
         volatile auto keys = db->keysWithPrefix(prefix, 100);
     }
 
     auto prefix_end = steady_clock::now();
     double prefix_seconds = duration<double>(prefix_end - prefix_start).count();
-    std::cout << "100 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
+    std::cout << "1000 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
 
     std::atomic<size_t> remove_counter{ 0 };
     auto remove_start = steady_clock::now();
