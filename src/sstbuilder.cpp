@@ -1,6 +1,7 @@
 #include "sstbuilder.h"
 #include "utils.h"
 #include "sstfile.h"
+#include <algorithm>
 namespace iblock = sst::indexblock;
 
 void IndexBlockBuilder::addKey(const std::string& key, iblock::OffsetFieldType offset) {
@@ -18,8 +19,6 @@ std::vector<uint8_t> IndexBlockBuilder::build() {
     ret.swap(raw_data_);
     return ret;
 }
-
-
 
 SSTBuilder::SSTBuilder(const std::filesystem::path& path, uint32_t max_datablock_size, uint64_t seq_num)
     : index_block_builder_(), data_block_builder_(max_datablock_size),

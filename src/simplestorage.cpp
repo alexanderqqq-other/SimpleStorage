@@ -217,6 +217,14 @@ void SimpleStorage::removeAllTemporaryFiles() {
 
 void SimpleStorage::mergeAsync(int level, uint64_t maxSeqNum) {
     std::lock_guard lock(queue_mutex_);
+    if (!task_queue_.empty() && std::holds_alternative<MergeTask>(task_queue_.back())) {
+        auto& last_task = std::get<MergeTask>(task_queue_.back());
+        if (last_task.level == level) {
+            last_task.seq_num = std::max(last_task.seq_num, maxSeqNum);
+            task_queue_.back() = last_task; // Update the seq_num of the last merge task
+            return;
+        }
+    }
     task_queue_.push(MergeTask{ level, maxSeqNum });
     queue_cv_.notify_one();
 }

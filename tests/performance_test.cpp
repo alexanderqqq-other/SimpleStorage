@@ -46,7 +46,14 @@ namespace {
         try { return std::stoull(v); }
         catch (...) { return defValue; }
     }
+
+    std::string getKeyById(size_t id) {
+        std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
+        return getStringFromIndex(id) + pseudo_random_string(id) + long_value + std::to_string(id);
+    }
 }
+
+
 
 TEST(PerformanceTest, HighLoadMultiThread) {
     // Configure total data volume in MB via PERF_TOTAL_SIZE_MB env variable
@@ -76,15 +83,16 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     auto write_start = steady_clock::now();
     std::vector<std::thread> workers;
-    std::string long_value(50, 'x'); // minimum 50 bytes long value for testing
     std::vector<std::exception_ptr> exceptions(num_threads);
     std::cout << "Starting write with " << num_threads << " threads, target size: " << total_mb << " MB\n";
+
     for (size_t t = 0; t < num_threads; ++t) {
+
         workers.emplace_back([&, t]() {
             try {
                 while (true) {
                     size_t id = id_counter.fetch_add(1);
-                    std::string key = pseudo_random_string(id, 4) + long_value + std::to_string(id);
+                    std::string key = getKeyById(id);
                     auto entry = pseudo_random_value(id);
                     size_t size = Utils::onDiskEntrySize(key, entry.value);
                     uint64_t current = bytes_written.fetch_add(size);
@@ -140,7 +148,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
             while (true) {
                 size_t id = read_counter.fetch_add(1);
                 if (id >= total_entries) break;
-                std::string key = "key_" + std::to_string(id);
+                std::string key = getKeyById(id);
                 volatile auto val = db->get(key);
             }
             }
@@ -172,18 +180,19 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     std::cout << "Waiting for merge to complete...\n";
     auto meger_start = steady_clock::now();
     db->waitAllAsync();
-    std::cout << "Merge time: " << duration<double>(steady_clock::now() - meger_start).count() << " seconds\n";
+    std::cout << "Rest merge time: " << duration<double>(steady_clock::now() - meger_start).count() << " seconds\n";
     std::cout << "Total size on disk after merge: " << get_directory_size_mb_str(temp_dir) << "\n";
-
+    std::cout << "Reading values by prefix\n";
     // Prefix search timings for a few ranges
     auto prefix_start = steady_clock::now();
-    for (int i = 0; i < 10; ++i) {
-        std::string prefix = "key_" + std::to_string(i);
+    for (int i = 0; i < 10000; i+=100) {
+        std::string prefix = getStringFromIndex(i);
         volatile auto keys = db->keysWithPrefix(prefix, 100);
     }
+
     auto prefix_end = steady_clock::now();
     double prefix_seconds = duration<double>(prefix_end - prefix_start).count();
-    std::cout << "Prefix search completed in " << prefix_seconds << " seconds\n";
+    std::cout << "100 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
 
     std::atomic<size_t> remove_counter{ 0 };
     auto remove_start = steady_clock::now();
@@ -194,7 +203,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
                 while (true) {
                     size_t id = remove_counter.fetch_add(1);
                     if (id >= total_entries) break;
-                    std::string key = "key_" + std::to_string(id);
+                    std::string key = getKeyById(id);
                     db->remove(key);
                 }
             }
@@ -230,6 +239,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     double shrink_seconds = duration<double>(shrink_end - shrink_start).count();
     std::cout << "Shrink completed in " << shrink_seconds << " seconds\n";
     std::cout << "Final size on disk: " << get_directory_size_mb_str(temp_dir) << "\n";
+    std::cout << "Total test time:" << duration<double>(steady_clock::now() - write_start).count() << " seconds\n";
     SUCCEED();
 }
 

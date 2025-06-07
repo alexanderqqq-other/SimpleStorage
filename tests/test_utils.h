@@ -21,6 +21,16 @@ uint64_t mix(uint64_t x) {
     return x;
 }
 
+std::string getStringFromIndex(int i) {
+    const int LEN = 5;
+    std::string result(LEN, 'a');
+    for (int pos = LEN - 1; pos >= 0; --pos) {
+        result[pos] = 'a' + (i % 26); // Map to 'a'-'z'
+        i /= 26;
+    }
+    return result;
+}
+
 std::string pseudo_random_string(uint64_t i, int length = 10) {
     const char charset[] = "abcdefghijklmnopqrstuvwxyz";
     const int charset_size = sizeof(charset) - 1; // exclude null terminator

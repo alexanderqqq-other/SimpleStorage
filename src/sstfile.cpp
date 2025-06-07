@@ -197,6 +197,13 @@ std::unique_ptr<SSTFile> SSTFile::readAndCreate(const std::filesystem::path& sst
 
 std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
+    if (prefix > maxKey()) {
+        return result;
+    }
+    auto min_key = minKey();
+    if (prefix < min_key && min_key.rfind(prefix, 0) != 0) {
+        return result;
+    }
     result.reserve(max_results);
     auto it = findDBlockOffset(prefix);
     if (it == index_block_.end()) {
@@ -205,6 +212,9 @@ std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsi
     for (; it != index_block_.end() &&
         result.size() < static_cast<size_t>(max_results);
         ++it) {
+        if (prefix < it->first && it->first.rfind(prefix, 0) != 0) {
+            break;
+        }
         auto block_data = readDatablock(it->second, getDatablockSize(it));
         DataBlock block(std::move(block_data));
         auto keys = block.keysWithPrefix(prefix, max_results - static_cast<int>(result.size()));
