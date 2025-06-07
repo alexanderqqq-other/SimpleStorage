@@ -770,3 +770,37 @@ TEST_F(SSTFileTest, Merge_WithMultiple) {
 
     }
 }
+
+TEST_F(SSTFileTest, Merge_AllRemovedEntries) {
+    uint64_t seq1 = 1;
+    uint64_t seq2 = 2;
+    std::vector<std::pair<std::string, TestEntry>> removed1 = {
+        {"a", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+        {"b", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+    };
+    std::vector<std::pair<std::string, TestEntry>> removed2 = {
+        {"a", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+        {"c", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+    };
+    auto sst1_path = temp_dir / "removed1.vsst";
+    auto sst2_path = temp_dir / "removed2.vsst";
+    std::sort(removed1.begin(), removed1.end(), [](auto& a, auto& b){return a.first < b.first;});
+    std::sort(removed2.begin(), removed2.end(), [](auto& a, auto& b){return a.first < b.first;});
+    auto sst1 = SSTFile::writeAndCreate(sst1_path, BLOCK_SIZE, seq1, true, removed1.begin(), removed1.end());
+    auto sst2 = SSTFile::writeAndCreate(sst2_path, BLOCK_SIZE, seq2, true, removed2.begin(), removed2.end());
+    ASSERT_TRUE(sst1);
+    ASSERT_TRUE(sst2);
+
+    // merge with no destination
+    {
+        auto merged = SSTFile::merge(sst1_path, {}, temp_dir2, 1024, BLOCK_SIZE, false);
+        EXPECT_TRUE(merged.empty());
+    }
+
+    // merge with another removed file
+    {
+        std::vector<std::filesystem::path> dst_files{ sst2_path };
+        auto merged = SSTFile::merge(sst1_path, dst_files, temp_dir2, 1024, BLOCK_SIZE, false);
+        EXPECT_TRUE(merged.empty());
+    }
+}

@@ -57,3 +57,19 @@ TEST_F(GeneralLevelTest, KeyBeforeFirst_NoSSTReturned) {
 
     EXPECT_FALSE(level.get("000").has_value());
 }
+
+TEST_F(GeneralLevelTest, MergeAllRemoved_NoNewFiles) {
+    std::vector<std::pair<std::string, TestEntry>> removed = {
+        {"a", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+        {"b", TestEntry{Entry{ValueType::REMOVED, {}}, 0}},
+    };
+
+    GeneralLevel level(dir, 1 << 20, 10, true);
+
+    auto src_path = dir / "src.vsst";
+    auto sst_src = SSTFile::writeAndCreate(src_path, 4096, 1, true, removed.begin(), removed.end());
+    ASSERT_TRUE(sst_src);
+
+    auto res = level.mergeToTmp(src_path, 4096);
+    EXPECT_TRUE(res.new_files.empty());
+}

@@ -268,8 +268,11 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
     std::vector<std::unique_ptr<SSTFile>>  dst_files;
     if (dst_file_paths.empty()) {
         auto first_out_path = out_dir / ("merged_" + std::to_string(sst1->seqNum()) + ".tmp");
-        dst_files.push_back(SSTFile::writeAndCreate(first_out_path, datablock_size, sst1->seqNum(),
-            keep_removed, sst1->begin(), sst1->end()));
+        auto new_sst = SSTFile::writeAndCreate(first_out_path, datablock_size, sst1->seqNum(),
+            keep_removed, sst1->begin(), sst1->end());
+        if (new_sst) {
+            dst_files.push_back(std::move(new_sst));
+        }
         return dst_files;
     }
 
@@ -304,7 +307,10 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
             copyFile(sst1);
         }
         std::vector<std::unique_ptr<SSTFile>> res;
-        res.push_back(builder.finalize());
+        auto new_sst = builder.finalize();
+        if (new_sst) {
+            res.push_back(std::move(new_sst));
+        }
         return res;
     }
     std::vector<std::unique_ptr<SSTFile>>  result;
@@ -332,7 +338,10 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
         }
 
         if (builder.currentSize() >= max_file_size - datablock_size) {
-            result.push_back(builder.finalize());
+            auto new_sst = builder.finalize();
+            if (new_sst) {
+                result.push_back(std::move(new_sst));
+            }
             ++current_seq_index;
             if (current_seq_index >= seq_nums.size()) {
                 throw std::runtime_error("Merge result can not exceed dsestanation file numbers + 1");
@@ -389,6 +398,9 @@ std::vector<std::unique_ptr<SSTFile>>  SSTFile::merge(
         }
         ++it2;
     }
-    result.push_back(builder.finalize());
+    auto new_sst = builder.finalize();
+    if (new_sst) {
+        result.push_back(std::move(new_sst));
+    }
     return result;
 }
