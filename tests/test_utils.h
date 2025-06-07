@@ -1,4 +1,4 @@
-﻿#include "../src/types.h"
+#include "../src/types.h"
 #include <vector>
 constexpr int BIG_BLOCK_SIZE = 16 * 1024;
 constexpr int BIG_BATCH1 = 800;
