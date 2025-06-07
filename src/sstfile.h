@@ -126,8 +126,8 @@ public:
         return iterator(); // default‐constructed = “end”
     }
 
-    SSTFile(SSTFile&&) = default;
-    SSTFile& operator=(SSTFile&&) = default;
+    SSTFile(SSTFile&&) = delete;
+    SSTFile& operator=(SSTFile&&) = delete;
     SSTFile(const SSTFile&) = delete;
     SSTFile& operator=(const SSTFile&) = delete;
     std::vector<std::string> keysWithPrefix(const std::string& prefix,

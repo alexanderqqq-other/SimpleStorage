@@ -94,6 +94,4 @@ private:
     StorageLockFile lock_file_;
 
     static uint64_t sst_sequence_number;
-
-    // std::unique_ptr<WAL> wal_;
 };
