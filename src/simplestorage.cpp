@@ -27,7 +27,7 @@ namespace {
 
         constexpr int GROWTH_SIZE_FACTOR = 5;
         constexpr int GROWH_FILE_NUMBER_FACTOR = 2;
-        auto file_size = memtable_size_bytes;
+        uint64_t file_size = memtable_size_bytes;
         auto num_files = l0_max_files;
         while (true) {
             file_size *= GROWTH_SIZE_FACTOR;
