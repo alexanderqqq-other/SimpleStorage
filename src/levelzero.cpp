@@ -30,11 +30,11 @@ std::optional<Entry> LevelZero::get(const std::string& key) const {
 }
 
 bool LevelZero::remove(const std::string& key, uint64_t max_seq_num) {
-    for (auto& sst : sst_files_) {
-        if( sst->seqNum() > max_seq_num) {
+    for (auto it = sst_files_.rbegin(); it != sst_files_.rend(); ++it) {
+        if ((*it)->seqNum() > max_seq_num) {
             continue; // Skip SST files with higher sequence numbers
         }
-        if (sst->remove(key)) {
+        if ((*it)->remove(key)) {
             return true;
         }
     }
