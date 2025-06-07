@@ -175,13 +175,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
 
     std::cout << "Read while merging " << total_entries << " entries in " << read_seconds << " seconds using " << num_threads << " threads\n";
     std::cout << "Total size on disk after read: " << get_directory_size_mb_str(temp_dir) << "\n";
-
-    std::cout << "Waiting for merge to complete...\n";
-    auto meger_start = steady_clock::now();
-    db->waitAllAsync();
-    std::cout << "Rest merge time: " << duration<double>(steady_clock::now() - meger_start).count() << " seconds\n";
-    std::cout << "Total size on disk after merge: " << get_directory_size_mb_str(temp_dir) << "\n";
-    std::cout << "Reading values by prefix\n";
+    std::cout << "Reading values by prefix while merging...\n";
     // Prefix search timings for a few ranges
     auto prefix_start = steady_clock::now();
     for (int i = 0; i < 10000; i+=10) {
@@ -192,7 +186,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     auto prefix_end = steady_clock::now();
     double prefix_seconds = duration<double>(prefix_end - prefix_start).count();
     std::cout << "1000 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
-    std::cout << "Removing all entries\n";
+    std::cout << "Removing every second entries while merging...\n";
     std::atomic<size_t> remove_counter{ 0 };
     auto remove_start = steady_clock::now();
     workers.clear();
@@ -200,7 +194,7 @@ TEST(PerformanceTest, HighLoadMultiThread) {
         workers.emplace_back([&, t]() {
             try {
                 while (true) {
-                    size_t id = remove_counter.fetch_add(1);
+                    size_t id = remove_counter.fetch_add(2);
                     if (id >= total_entries) break;
                     std::string key = getKeyById(id);
                     db->remove(key);
@@ -224,13 +218,20 @@ TEST(PerformanceTest, HighLoadMultiThread) {
             }
         }
     }
-    db->flush();
-    db->waitAllAsync();
+
     auto remove_end = steady_clock::now();
 
     double remove_seconds = duration<double>(remove_end - remove_start).count();
     std::cout << "Removed " << total_entries << " entries in " << remove_seconds << " seconds using " << num_threads << " threads\n";
-    std::cout << "Total size on disk after remove: " << get_directory_size_mb_str(temp_dir) << "\n";
+    std::cout << "\n\n";
+    std::cout << "Total test time:" << duration<double>(steady_clock::now() - write_start).count() << " seconds\n";
+    std::cout << "\n\n";
+    std::cout << "Waiting for merge to complete... It might take significant time\n";
+    db->flush();
+    auto meger_start = steady_clock::now();
+    db->waitAllAsync();
+    std::cout << "Rest merge time: " << duration<double>(steady_clock::now() - meger_start).count() << " seconds\n";
+    std::cout << "Total size on disk after merge: " << get_directory_size_mb_str(temp_dir) << "\n";
     std::cout << "shrinking database\n";
     auto shrink_start = steady_clock::now();
     db->shrink();

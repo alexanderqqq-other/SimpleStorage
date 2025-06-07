@@ -362,6 +362,14 @@ PERF_THREADS = 8 # Set number of threads for performance tests, default is 8
 PERF_MEMTABLE_SIZE_MB = 64 # Set memtable size in MB for performance tests, default is 64MB
 
 Test use random pseudo-random data, uncluding huge BLOBs with size ~10kb. So minimum recommended block size is 16kb
+~10-15% of reading time is spent to key generation in test itself according to profiler.
+The slowest operation is merge, which is expected due to the nature of LSM trees.
+It does'nt block any read/write/remove operation. It just slows down them due to a lot of files stucked at L0 level.
+After merge is finished, search operations will be much faster because of less files at L0 level.
+The only shrink and removeAsync oprations will be blocked by merge.
+
+waitAllAsync() may block for a long time if there are many background tasks queued, especially if merge or shrink is in progress.
+
 
 
 ---
