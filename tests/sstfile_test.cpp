@@ -522,8 +522,8 @@ TEST_F(SSTFileTest, Merge_WithDuplicatesAndRemoved) {
         };
 
     // Save as SST files (with tiny block size to force many DataBlocks)
-    auto sst1_path = temp_dir / "sst1->vsst";
-    auto sst2_path = temp_dir / "sst2->vsst";
+    auto sst1_path = temp_dir / "sst1.vsst";
+    auto sst2_path = temp_dir / "sst2.vsst";
     uint32_t block_size = 64; // tiny block size
     std::sort(data1.begin(), data1.end(), [](auto& a, auto& b) { return a.first < b.first; });
     std::sort(data2.begin(), data2.end(), [](auto& a, auto& b) { return a.first < b.first; });
