@@ -121,7 +121,7 @@ TEST_F(LevelZeroTest, RemoveDoesNotAffectHigherSeq) {
     std::vector<std::pair<std::string, TestEntry>> v1 = {
         {"a", {Entry{ValueType::UINT32, uint32_t(1)}, 0}} };
     std::vector<std::pair<std::string, TestEntry>> v2 = {
-        {"a", {Entry{ValueType::UINT32, uint32_t(2)}, 0}} };
+        {"b", {Entry{ValueType::UINT32, uint32_t(2)}, 0}} };
     auto s1 = createSST(1, v1);
     auto s2 = createSST(2, v2);
     std::vector<std::unique_ptr<SSTFile>>  vec3;
@@ -129,10 +129,13 @@ TEST_F(LevelZeroTest, RemoveDoesNotAffectHigherSeq) {
     vec3.push_back(std::move(s2));
     lz.addSST(std::move(vec3));
 
-    EXPECT_TRUE(lz.remove("a", 2));
+
+    EXPECT_FALSE(lz.remove("a", 0));
+    EXPECT_TRUE(lz.remove("a", 1));
     auto val = lz.get("a");
     ASSERT_TRUE(val.has_value());
-    EXPECT_EQ(std::get<uint32_t>(val->value), 2u);
+    EXPECT_EQ(val->type, ValueType::REMOVED);
+
 
     EXPECT_FALSE(lz.remove("missing", 2));
 }
