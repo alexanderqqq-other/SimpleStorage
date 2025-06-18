@@ -39,7 +39,7 @@ EntryStatus MemTable::status(const std::string& key) const {
 
 std::vector<std::string> MemTable::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
-    result.reserve(max_results);
+    result.reserve(std::min(static_cast<size_t>(max_results), data_.size()));
 
     for (auto it = data_.lower_bound(prefix);
         it != data_.end() && result.size() < static_cast<size_t>(max_results); ++it) {

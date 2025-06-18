@@ -54,7 +54,6 @@ EntryStatus LevelZero::status(const std::string& key) const {
 
 std::vector<std::string> LevelZero::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
-    result.reserve(max_results);
     for (auto it = sst_files_.rbegin(); it != sst_files_.rend() && result.size() < max_results; ++it) {
         auto keys = (*it)->keysWithPrefix(prefix, max_results - result.size());
         result.insert(result.end(),

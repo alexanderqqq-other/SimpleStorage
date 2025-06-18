@@ -149,10 +149,10 @@ bool SimpleStorage::exists(const std::string& key) const {
 std::vector<std::string> SimpleStorage::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::shared_lock lock(readwrite_mutex_);
     std::vector<std::string> ret;
-    ret.reserve(max_results);
     std::unordered_set<std::string> seen;
     for (const auto& level : levels_) {
         auto keys = level->keysWithPrefix(prefix, max_results - ret.size());
+        ret.reserve(ret.size() + keys.size());
         for (auto& key : keys) {
             if (seen.insert(key).second) {
                 ret.push_back(std::move(key));

@@ -116,7 +116,7 @@ std::pair<std::string, DataBlock::DataBlockEntry> DataBlock::get(sst::datablock:
 std::vector<std::string> DataBlock::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
     if (count_ == 0) return result;
-    result.reserve(static_cast<size_t>(max_results));
+    result.reserve(std::min(static_cast<uint32_t>(max_results), count_));
     auto offset_idx = lowerBoundOffset(prefix);
     for (sst::datablock::CountFieldType i = offset_idx; i < count_ && result.size() < static_cast<size_t>(max_results); ++i) {
         uint64_t pos = posByOffset(i);

@@ -223,7 +223,6 @@ std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsi
     if (prefix < min_key && min_key.rfind(prefix, 0) != 0) {
         return result;
     }
-    result.reserve(max_results);
     auto it = findDBlockOffset(prefix);
     if (it == index_block_.end()) {
         it = index_block_.begin(); // Key is out of the block, but prefix might be less then min_key

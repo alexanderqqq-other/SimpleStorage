@@ -90,7 +90,6 @@ EntryStatus GeneralLevel::status(const std::string& key) const {
 
 std::vector<std::string> GeneralLevel::keysWithPrefix(const std::string& prefix, unsigned int max_results) const {
     std::vector<std::string> result;
-    result.reserve(max_results);
     for (auto it = sst_file_map_.lower_bound(prefix); it != sst_file_map_.end(); ++it) {
         const auto& sst = *(it->second);
         auto keys = sst->keysWithPrefix(prefix, max_results - result.size());

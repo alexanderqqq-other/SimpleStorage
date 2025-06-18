@@ -72,6 +72,19 @@ TEST_F(SimpleStorageTest, PrefixSearch) {
     EXPECT_TRUE(std::find(keys.begin(), keys.end(), "foo:2") != keys.end());
 }
 
+TEST_F(SimpleStorageTest, PrefixSearchLarge) {
+    auto db = std::make_shared<SimpleStorage>(temp_dir, config);
+    int size = 500000;
+    for (int i = 0; i < size; ++i) {
+        db->put("foo:" + std::to_string(i), i);
+    }
+
+    auto keys = db->keysWithPrefix("foo:");
+    EXPECT_EQ(keys.size(), 1000);
+    keys = db->keysWithPrefix("foo:", std::numeric_limits<unsigned int>::max());
+    EXPECT_EQ(keys.size(), size);
+}
+
 TEST_F(SimpleStorageTest, FlushAndCompact_Smoke) {
     auto db = std::make_shared<SimpleStorage>(temp_dir, config);
 
