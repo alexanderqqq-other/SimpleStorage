@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <functional>
 
 class DataBlock {
 public:
@@ -16,6 +17,8 @@ public:
     std::optional<Entry> get(const std::string& key) const;
     std::pair<std::string, DataBlockEntry> get(sst::datablock::CountFieldType offsetIdx) const;
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results) const;
+    bool forEachKeyWithPrefix(const std::string& prefix,
+        const std::function<bool(const std::string&)>& callback) const;
     bool remove(const std::string& key);
     EntryStatus status(const std::string& key) const;
 

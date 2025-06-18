@@ -106,3 +106,26 @@ TEST_F(MemTableTest, KeysWithPrefix_RemovedAndExpired) {
     ASSERT_TRUE(keys.size() == 1);
     EXPECT_EQ(keys[0], "abc5");
 }
+
+TEST_F(MemTableTest, ForEachKeyWithPrefix_Basic) {
+    memtable->put("abc1", Entry{ ValueType::UINT32, uint32_t(1) }, std::numeric_limits<uint64_t>::max());
+    memtable->put("abc2", Entry{ ValueType::UINT32, uint32_t(2) }, std::numeric_limits<uint64_t>::max());
+    memtable->put("abd1", Entry{ ValueType::UINT32, uint32_t(3) }, std::numeric_limits<uint64_t>::max());
+
+    std::vector<std::string> keys;
+    memtable->forEachKeyWithPrefix("abc", [&](const std::string& k) {
+        keys.push_back(k);
+        return true;
+    });
+    ASSERT_EQ(keys.size(), 2u);
+    EXPECT_EQ(keys[0], "abc1");
+    EXPECT_EQ(keys[1], "abc2");
+
+    std::vector<std::string> stop;
+    memtable->forEachKeyWithPrefix("abc", [&](const std::string& k) {
+        stop.push_back(k);
+        return false;
+    });
+    ASSERT_EQ(stop.size(), 1u);
+    EXPECT_EQ(stop[0], "abc1");
+}

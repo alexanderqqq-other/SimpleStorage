@@ -1,4 +1,5 @@
 #include "datablock.h"
+#include "datablock.h"
 #include "utils.h"
 
 namespace dblock = sst::datablock;
@@ -127,8 +128,35 @@ std::vector<std::string> DataBlock::keysWithPrefix(const std::string& prefix, un
             }
             result.push_back(entry_key);
         }
+        else {
+            break;
+        }
     }
     return result;
+}
+
+bool DataBlock::forEachKeyWithPrefix(const std::string& prefix,
+    const std::function<bool(const std::string&)>& callback) const {
+    if (count_ == 0) return true; // No entries to iterate over
+    auto offset_idx = lowerBoundOffset(prefix);
+    for (sst::datablock::CountFieldType i = offset_idx; i < count_; ++i) {
+        uint64_t pos = posByOffset(i);
+        std::string entry_key = parseKey(pos);
+        if (entry_key.compare(0, prefix.size(), prefix) == 0) {
+            ValueType type = parseValueType(pos, entry_key.size());
+            if (type == ValueType::REMOVED) {
+                continue;
+            }
+            if (!callback(entry_key)) {
+                return false; // Stop iteration if callback returns false
+            }
+        }
+        else {
+            return true; 
+        }
+    }
+    return true;
+    
 }
 
 bool DataBlock::remove(const std::string& key) {

@@ -1,3 +1,4 @@
+#include "memtable.h"
 // memtable.cpp
 #include "memtable.h"
 #include "constants.h"
@@ -51,6 +52,21 @@ std::vector<std::string> MemTable::keysWithPrefix(const std::string& prefix, uns
         }
     }
     return result;
+}
+
+bool MemTable::forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const {
+    for (auto it = data_.lower_bound(prefix); it != data_.end(); ++it) {
+        const auto& key = it->first;
+        if (key.compare(0, prefix.size(), prefix) != 0) {
+            return true; 
+        }
+        if (!isExpired(it->second) && it->second.entry.type != ValueType::REMOVED) {
+            if (!callback(key)) {
+                return false; // Stop iterating if callback returns false
+            }
+        }
+    }
+    return true;
 }
 
 bool MemTable::remove(const std::string& key) {

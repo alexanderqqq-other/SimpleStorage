@@ -1,4 +1,5 @@
 #include "sstfile.h"
+#include "sstfile.h"
 #include "utils.h"
 #include <array>
 namespace iblock = sst::indexblock;
@@ -241,6 +242,32 @@ std::vector<std::string> SSTFile::keysWithPrefix(const std::string& prefix, unsi
     }
 
     return result;
+}
+
+bool SSTFile::forEachKeyWithPrefix(const std::string& prefix,
+    const std::function<bool(const std::string&)>& callback) const {
+    if (prefix > maxKey()) {
+        return true;
+    }
+    auto min_key = minKey();
+    if (prefix < min_key && min_key.rfind(prefix, 0) != 0) {
+        return true;
+    }
+    auto it = findDBlockOffset(prefix);
+    if (it == index_block_.end()) {
+        it = index_block_.begin(); // Key is out of the block, but prefix might be less then min_key
+    }
+    for (; it != index_block_.end(); ++it) {
+        if (prefix < it->first && it->first.rfind(prefix, 0) != 0) {
+            break; // No more keys with this prefix
+        }
+        auto block_data = readDatablock(it->second, getDatablockSize(it));
+        DataBlock block(std::move(block_data));
+        if (!block.forEachKeyWithPrefix(prefix, callback)) {
+            return false; // Stop if callback returns false
+        }
+    }
+    return true;
 }
 
 std::unique_ptr<SSTFile> SSTFile::shrink(uint32_t datablock_size) const {

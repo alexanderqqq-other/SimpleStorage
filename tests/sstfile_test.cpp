@@ -804,3 +804,31 @@ TEST_F(SSTFileTest, Merge_AllRemovedEntries) {
         EXPECT_TRUE(merged.empty());
     }
 }
+
+TEST_F(SSTFileTest, ForEachKeyWithPrefix_Basic) {
+    std::vector<std::pair<std::string, TestEntry>> items = {
+        {"a1", TestEntry{Entry{ValueType::UINT8, uint8_t(1)}, 0}},
+        {"a2", TestEntry{Entry{ValueType::UINT8, uint8_t(2)}, 0}},
+        {"a3", TestEntry{Entry{ValueType::UINT8, uint8_t(3)}, 0}},
+        {"b1", TestEntry{Entry{ValueType::UINT8, uint8_t(4)}, 0}}
+    };
+    std::sort(items.begin(), items.end(), [](auto& a, auto& b){ return a.first < b.first; });
+    auto file = SSTFile::writeAndCreate(TMP_SST_PATH, BLOCK_SIZE, 0, true, items.begin(), items.end());
+    std::vector<std::string> keys;
+    file->forEachKeyWithPrefix("a", [&](const std::string& k){
+        keys.push_back(k);
+        return true;
+    });
+    ASSERT_EQ(keys.size(), 3u);
+    EXPECT_EQ(keys[0], "a1");
+    EXPECT_EQ(keys[1], "a2");
+    EXPECT_EQ(keys[2], "a3");
+
+    std::vector<std::string> stop;
+    file->forEachKeyWithPrefix("a", [&](const std::string& k){
+        stop.push_back(k);
+        return false;
+    });
+    ASSERT_EQ(stop.size(), 1u);
+    EXPECT_EQ(stop[0], "a1");
+}

@@ -3,6 +3,7 @@
 #include "ilevel.h"
 
 #include <filesystem>
+#include <functional>
 // Implementation of Level 0. Key ranges may overlap.
 class LevelZero : public IFileLevel {
 public:
@@ -12,6 +13,8 @@ public:
     bool remove(const std::string& key, uint64_t max_seq_num) override;
     EntryStatus status(const std::string& key) const override;
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results) const override;
+    bool forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const override;
+
     std::vector<std::filesystem::path> filelistToMerge(uint64_t max_seq_num) const override;
     MergeResult mergeToTmp(const std::filesystem::path&, size_t datablock_size) const override;
     void addSST(std::vector<std::unique_ptr<SSTFile>>  sst) override;

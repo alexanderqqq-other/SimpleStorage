@@ -1,4 +1,5 @@
 #include "simplestorage.h"
+#include "simplestorage.h"
 #include "constants.h"
 #include "levelzero.h"
 #include "generallevel.h"
@@ -161,6 +162,16 @@ std::vector<std::string> SimpleStorage::keysWithPrefix(const std::string& prefix
         }
     }
     return ret;
+}
+
+void SimpleStorage::forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const {
+    std::shared_lock lock(readwrite_mutex_);
+    std::unordered_set<std::string> seen;
+    for (const auto& level : levels_) {
+        if (!level->forEachKeyWithPrefix(prefix, callback)) {
+            return; // If callback returns false, stop iterating
+        }
+    }
 }
 
 

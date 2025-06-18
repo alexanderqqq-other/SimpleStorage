@@ -14,6 +14,7 @@ public:
     virtual std::optional<Entry> get(const std::string& key) const = 0;
     virtual EntryStatus status(const std::string& key) const = 0;
     virtual std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results) const = 0;
+    virtual bool forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const = 0;
 
 };
 

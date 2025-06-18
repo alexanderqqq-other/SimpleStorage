@@ -178,14 +178,24 @@ TEST(PerformanceTest, HighLoadMultiThread) {
     std::cout << "Reading values by prefix while merging...\n";
     // Prefix search timings for a few ranges
     auto prefix_start = steady_clock::now();
-    for (int i = 0; i < 10000; i+=10) {
-        std::string prefix = getStringFromIndex(i);
-        volatile auto keys = db->keysWithPrefix(prefix, 100);
+    uint64_t total_found=0;
+    for (int i = 0; i < 10000; i++) {
+        std::string prefix = getStringFromIndex(i).substr(0, 4);
+        std::vector<std::string> keys;
+        db->forEachKeyWithPrefix(prefix, [&](const std::string& k) {
+            keys.push_back(k);
+            if (keys.size() >= 100) {
+                return false; // Limit to 100 results
+            }
+            return true;
+        });
+        total_found += keys.size();
     }
 
     auto prefix_end = steady_clock::now();
     double prefix_seconds = duration<double>(prefix_end - prefix_start).count();
-    std::cout << "1000 prefix search with 100 limitation completed in " << prefix_seconds << " seconds\n";
+    std::cout << "10000 prefix search with 100 limitation completed in " << prefix_seconds 
+        << " seconds, total found: " << total_found << "\n";
     std::cout << "Removing every second entries while merging...\n";
     std::atomic<size_t> remove_counter{ 0 };
     auto remove_start = steady_clock::now();

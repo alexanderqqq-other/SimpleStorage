@@ -1,4 +1,5 @@
 #include "generallevel.h"
+#include "generallevel.h"
 #include <regex>
 namespace {
     constexpr auto file_extension = ".vsst";
@@ -99,6 +100,16 @@ std::vector<std::string> GeneralLevel::keysWithPrefix(const std::string& prefix,
         if (result.size() >= max_results) break;
     }
     return result;
+}
+
+bool GeneralLevel::forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const {
+    for (auto it = sst_file_map_.lower_bound(prefix); it != sst_file_map_.end(); ++it) {
+        const auto& sst = *(it->second);
+        if (!sst->forEachKeyWithPrefix(prefix, callback)) {
+            return false; // If callback returns false, stop iterating
+        }
+    }
+    return true;
 }
 
 

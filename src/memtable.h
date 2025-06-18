@@ -2,6 +2,7 @@
 #include <map>
 #include <string>
 #include <optional>
+#include <functional>
 #include <chrono>
 #include "types.h"
 #include "ilevel.h"
@@ -20,7 +21,8 @@ public:
     bool remove(const std::string& key);
     EntryStatus status(const std::string& key) const override;
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results) const override;
-   
+    bool forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const override;
+
     auto begin() const noexcept(noexcept(data_.begin())) {
         return data_.begin();
     }

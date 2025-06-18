@@ -1,4 +1,5 @@
 #include "levelzero.h"
+#include "levelzero.h"
 namespace {
     constexpr auto file_extension = ".vsst";
     constexpr auto file_prefix = "L0_";
@@ -63,6 +64,15 @@ std::vector<std::string> LevelZero::keysWithPrefix(const std::string& prefix, un
             break;
     }
     return result;
+}
+
+bool LevelZero::forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const {
+    for (auto it = sst_files_.rbegin(); it != sst_files_.rend(); ++it) {
+        if (!(*it)->forEachKeyWithPrefix(prefix, callback)) {
+            return false; // Stop if callback returns false
+        }
+    }
+    return true;
 }
 
 

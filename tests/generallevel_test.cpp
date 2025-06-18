@@ -73,3 +73,38 @@ TEST_F(GeneralLevelTest, MergeAllRemoved_NoNewFiles) {
     auto res = level.mergeToTmp(src_path, 4096);
     EXPECT_TRUE(res.new_files.empty());
 }
+
+TEST_F(GeneralLevelTest, ForEachKeyWithPrefix_Basic) {
+    std::vector<std::pair<std::string, TestEntry>> items1 = {
+        {"aa1", TestEntry{Entry{ValueType::UINT32, uint32_t(1)}, 0}},
+        {"aa2", TestEntry{Entry{ValueType::UINT32, uint32_t(2)}, 0}}
+    };
+    auto sst1 = SSTFile::writeAndCreate(dir / "first.vsst", 4096, 1, true,
+        items1.begin(), items1.end());
+
+    std::vector<std::pair<std::string, TestEntry>> items2 = {
+        {"ab1", TestEntry{Entry{ValueType::UINT32, uint32_t(3)}, 0}}
+    };
+    auto sst2 = SSTFile::writeAndCreate(dir / "second.vsst", 4096, 2, true,
+        items2.begin(), items2.end());
+
+    GeneralLevel level(dir, 1 << 20, 10, true);
+
+    std::vector<std::string> keys;
+    level.forEachKeyWithPrefix("a", [&](const std::string& k) {
+        keys.push_back(k);
+        return true;
+    });
+    ASSERT_EQ(keys.size(), 3u);
+    EXPECT_EQ(keys[0], "aa1");
+    EXPECT_EQ(keys[1], "aa2");
+    EXPECT_EQ(keys[2], "ab1");
+
+    std::vector<std::string> stop;
+    level.forEachKeyWithPrefix("a", [&](const std::string& k) {
+        stop.push_back(k);
+        return false;
+    });
+    ASSERT_EQ(stop.size(), 1u);
+    EXPECT_EQ(stop[0], "aa1");
+}

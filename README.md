@@ -200,12 +200,20 @@ struct Entry {
 Retrieve a list of keys that start with the specified prefix. Optionally, limit the number of results returned.
 **Parameters**:
 
-- prefix: UTF-8 string, maximum length 65535 bytes.
+- prefix: UTF-8 string, maximum length 1024 bytes.
 - max_results: maximum number of results to return (default is 1000).
 
 **Return**:
 
 - `std::vector<std::string>`: a vector of keys that match the prefix.
+- 
+### forEachKeyWithPrefix
+
+Iterate over all keys that match a prefix without accumulating them in memory. The provided callback is invoked for each key.
+**Parameters**:
+
+- prefix: UTF-8 string, maximum length 1024 bytes.
+- callback: function called with each matching key. Return `false` to stop iteration early.
 
 ### remove
 

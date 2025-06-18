@@ -267,3 +267,31 @@ TEST(DataBlockTest, KeysWithPrefix_Status_Remove) {
     EXPECT_FALSE(block.remove("notfound"));
     EXPECT_TRUE(block.remove("pre_abc"));
 }
+
+TEST(DataBlockTest, ForEachKeyWithPrefix_Basic) {
+    DataBlockBuilder builder(4096);
+    builder.addEntry("pre_a", Entry{ ValueType::UINT32, uint32_t(1) }, 0);
+    builder.addEntry("pre_b", Entry{ ValueType::UINT32, uint32_t(2) }, 0);
+    builder.addEntry("pre_c", Entry{ ValueType::UINT32, uint32_t(3) }, 0);
+    builder.addEntry("zzz", Entry{ ValueType::UINT32, uint32_t(4) }, 0);
+    auto data = builder.build();
+    DataBlock block(data);
+
+    std::vector<std::string> keys;
+    block.forEachKeyWithPrefix("pre_", [&](const std::string& k) {
+        keys.push_back(k);
+        return true;
+    });
+    ASSERT_EQ(keys.size(), 3u);
+    EXPECT_EQ(keys[0], "pre_a");
+    EXPECT_EQ(keys[1], "pre_b");
+    EXPECT_EQ(keys[2], "pre_c");
+
+    std::vector<std::string> first_only;
+    block.forEachKeyWithPrefix("pre_", [&](const std::string& k) {
+        first_only.push_back(k);
+        return false; // stop after first
+    });
+    ASSERT_EQ(first_only.size(), 1u);
+    EXPECT_EQ(first_only[0], "pre_a");
+}

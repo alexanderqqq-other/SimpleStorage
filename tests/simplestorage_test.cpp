@@ -149,3 +149,30 @@ TEST_F(SimpleStorageTest, LargeVolume_Merge) {
         EXPECT_FALSE(db->get("to_remove_async").has_value());
     }
 }
+
+TEST_F(SimpleStorageTest, ForEachKeyWithPrefix_Basic) {
+    auto db = std::make_shared<SimpleStorage>(temp_dir, config);
+
+    db->put("foo:1", 1);
+    db->put("foo:2", 2);
+    db->put("foo:3", 3);
+    db->put("bar:1", 10);
+
+    std::vector<std::string> keys;
+    db->forEachKeyWithPrefix("foo:", [&](const std::string& k){
+        keys.push_back(k);
+        return true;
+    });
+    ASSERT_EQ(keys.size(), 3u);
+    EXPECT_EQ(keys[0], "foo:1");
+    EXPECT_EQ(keys[1], "foo:2");
+    EXPECT_EQ(keys[2], "foo:3");
+
+    std::vector<std::string> stop;
+    db->forEachKeyWithPrefix("foo:", [&](const std::string& k){
+        stop.push_back(k);
+        return false;
+    });
+    ASSERT_EQ(stop.size(), 1u);
+    EXPECT_EQ(stop[0], "foo:1");
+}

@@ -8,6 +8,7 @@
 #include <vector>
 #include <unordered_map>
 #include <mutex>
+#include <functional>
 
 #include "constants.h"
 #include "types.h"
@@ -132,6 +133,9 @@ public:
     SSTFile& operator=(const SSTFile&) = delete;
     std::vector<std::string> keysWithPrefix(const std::string& prefix,
         unsigned int max_results) const;
+    bool forEachKeyWithPrefix(const std::string& prefix,
+        const std::function<bool(const std::string&)>& callback) const;
+
     std::optional<Entry> get(const std::string& key) const;
     bool remove(const std::string& key);
     EntryStatus status(const std::string& key) const;

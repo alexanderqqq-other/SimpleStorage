@@ -15,6 +15,7 @@
 #include <condition_variable>
 #include <queue>
 #include <thread>
+#include <functional>
 
 
 class MemTable;
@@ -64,6 +65,7 @@ public:
     bool exists(const std::string& key) const;
 
     std::vector<std::string> keysWithPrefix(const std::string& prefix, unsigned int max_results = 1000) const;
+    void forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const;
 
     void clearCache();
     void flush();
