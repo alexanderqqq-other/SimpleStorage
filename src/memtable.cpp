@@ -1,6 +1,4 @@
 #include "memtable.h"
-// memtable.cpp
-#include "memtable.h"
 #include "constants.h"
 #include "utils.h"
 MemTable::MemTable(size_t max_size_bytes)

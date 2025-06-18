@@ -1,5 +1,5 @@
 #include "levelzero.h"
-#include "levelzero.h"
+#include <unordered_set>
 namespace {
     constexpr auto file_extension = ".vsst";
     constexpr auto file_prefix = "L0_";
@@ -66,9 +66,14 @@ std::vector<std::string> LevelZero::keysWithPrefix(const std::string& prefix, un
 }
 
 bool LevelZero::forEachKeyWithPrefix(const std::string& prefix, const std::function<bool(const std::string&)>& callback) const {
+    std::unordered_set<std::string> seen;
     for (auto it = sst_files_.rbegin(); it != sst_files_.rend(); ++it) {
-        if (!(*it)->forEachKeyWithPrefix(prefix, callback)) {
-            return false; // Stop if callback returns false
+        if (!(*it)->forEachKeyWithPrefix(prefix, [&](const std::string& k) {
+            if (seen.insert(k).second) {
+                return callback(k);
+            }
+            return true; })) {
+            return false;// Stop if callback returns false
         }
     }
     return true;

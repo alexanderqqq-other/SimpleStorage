@@ -1,5 +1,4 @@
 #include "datablock.h"
-#include "datablock.h"
 #include "utils.h"
 
 namespace dblock = sst::datablock;

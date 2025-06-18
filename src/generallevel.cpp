@@ -1,5 +1,4 @@
 #include "generallevel.h"
-#include "generallevel.h"
 #include <regex>
 namespace {
     constexpr auto file_extension = ".vsst";

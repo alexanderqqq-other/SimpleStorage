@@ -1,5 +1,4 @@
 #include "sstfile.h"
-#include "sstfile.h"
 #include "utils.h"
 #include <array>
 namespace iblock = sst::indexblock;
