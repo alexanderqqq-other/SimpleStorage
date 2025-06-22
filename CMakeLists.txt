@@ -60,7 +60,7 @@ foreach(test_src ${TEST_SOURCES})
     get_filename_component(test_name ${test_src} NAME_WE)
     add_executable(${test_name} ${test_src} "src/utils.cpp")
     target_link_libraries(${test_name} PRIVATE simplestorage_lib gtest_main)
-    if(${test_name} STREQUAL "performance_test")
+    if("${test_name}" MATCHES "performance")
         message(${test_name})
         gtest_discover_tests(
             ${test_name}

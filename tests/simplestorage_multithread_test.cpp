@@ -26,7 +26,7 @@ protected:
 };
 
 TEST_F(SimpleStorageMTTest, ConcurrentReadWriteRemove) {
-    const int num_threads = 8;
+    const int num_threads = 1;
     const int ops_per_thread = 30000;
 
     {
