@@ -6,7 +6,7 @@
 #include <chrono>
 #include "types.h"
 #include "ilevel.h"
-
+#include "skiplist.h"
 struct MemEntry {
     Entry entry;
     uint64_t expiration_ms = std::numeric_limits<uint64_t>::max();
@@ -31,12 +31,11 @@ public:
     }
     bool full() const noexcept;
     size_t count() const noexcept(noexcept(data_.size()));
-    void clear() noexcept(noexcept(data_.clear()));
 
 private:
     size_t max_size_bytes_;
-    size_t current_size_bytes_ = 0;
-    std::map<std::string, MemEntry> data_;
+    std::atomic<size_t> current_size_bytes_{ 0 };
+    SkipList<std::string, MemEntry> data_;
 
     bool isExpired(const MemEntry& entry) const;
 };

@@ -208,7 +208,7 @@ void SimpleStorage::flushImpl() {
         memTable()->begin(), memTable()->end()));
     auto* l = static_cast<IFileLevel*>(levels_[1].get());
     l->addSST(std::move(ssts));
-    memTable()->clear();
+    levels_[0] = std::make_unique<MemTable>(manifest_.getConfig().memtable_size_bytes);
     mergeAsync(1, l->maxSeqNum()); // Merge the MemTable into Level 0
 }
 

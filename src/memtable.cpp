@@ -8,11 +8,9 @@ MemTable::MemTable(size_t max_size_bytes)
 }
 
 void MemTable::put(const std::string& key, const Entry& entry, uint64_t expiration_ms) {
-    auto [_, inserted] = data_.insert_or_assign(key, MemEntry{entry, expiration_ms});
-    if (inserted) {
+   data_.insert(std::make_pair(key, MemEntry{entry, expiration_ms}));
         //KeyLengh + key + Expiration + ValueType + ValueLength (optional) + value + offset
-        current_size_bytes_ += Utils::onDiskEntrySize(key, entry.value);
-    }
+   current_size_bytes_.fetch_add(Utils::onDiskEntrySize(key, entry.value), std::memory_order_relaxed);
 }
 
 std::optional<Entry> MemTable::get(const std::string& key) const {
@@ -70,8 +68,7 @@ bool MemTable::forEachKeyWithPrefix(const std::string& prefix, const std::functi
 bool MemTable::remove(const std::string& key) {
     auto it = data_.find(key);
     if (it != data_.end()) {
-        it->second.expiration_ms = sst::datablock::EXPIRATION_DELETED;
-        it->second.entry.type = ValueType::REMOVED;
+        data_.insert(std::make_pair(key, MemEntry{ {ValueType::REMOVED, {}}, sst::datablock::EXPIRATION_DELETED }));
         return true;
     }
     return false;
@@ -79,17 +76,13 @@ bool MemTable::remove(const std::string& key) {
 
 
 bool MemTable::full() const noexcept {
-    return current_size_bytes_ >= max_size_bytes_;
+    return current_size_bytes_.load(std::memory_order::relaxed) >= max_size_bytes_;
 }
 
 size_t MemTable::count() const noexcept(noexcept(data_.size())) {
     return data_.size();
 }
 
-void MemTable::clear() noexcept(noexcept(data_.clear()))  {
-    data_.clear();
-    current_size_bytes_ = 0;
-}
 
 bool MemTable::isExpired(const MemEntry& entry) const {
     return Utils::isExpired(entry.expiration_ms);
